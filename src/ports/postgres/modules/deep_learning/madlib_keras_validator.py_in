@@ -52,8 +52,8 @@ import keras.metrics as metrics
 class InputValidator:
     @staticmethod
     def validate_predict_evaluate_tables(
-        module_name, model_table, model_summary_table, test_table, output_table,
-        independent_varname):
+            module_name, model_table, model_summary_table, test_table, output_table,
+            independent_varname):
         InputValidator._validate_model_weights_tbl(module_name, model_table)
         InputValidator._validate_model_summary_tbl(
             module_name, model_summary_table)
@@ -86,8 +86,8 @@ class InputValidator:
     @staticmethod
     def validate_pred_type(module_name, pred_type, class_values):
         if not pred_type in ['prob', 'response']:
-            plpy.error("{0}: Invalid value for pred_type param ({1}). Must be "\
-                "either response or prob.".format(module_name, pred_type))
+            plpy.error("{0}: Invalid value for pred_type param ({1}). Must be " \
+                       "either response or prob.".format(module_name, pred_type))
 
     @staticmethod
     def validate_input_shape(table, independent_varname, input_shape, offset,
@@ -130,35 +130,35 @@ class InputValidator:
             result = plpy.execute(query)[0]
 
         _assert(len(result) == len(input_shape),
-            "model_keras error: The number of dimensions ({0}) of each image"
-            " in model architecture and {1} in {2} ({3}) do not match.".format(
-                len(input_shape), independent_varname, table, len(result)))
+                "model_keras error: The number of dimensions ({0}) of each image"
+                " in model architecture and {1} in {2} ({3}) do not match.".format(
+                    len(input_shape), independent_varname, table, len(result)))
 
         for i in range(len(input_shape)):
             if is_minibatched:
                 key_name = i
                 input_shape_from_table = [result[j]
-                    for j in range(len(input_shape))]
+                                          for j in range(len(input_shape))]
             else:
                 key_format = "n_{0}"
                 key_name = key_format.format(i)
                 input_shape_from_table = [result[key_format.format(j)]
-                    for j in range(len(input_shape))]
+                                          for j in range(len(input_shape))]
 
             if result[key_name] != input_shape[i]:
                 # Construct the shape in independent varname to display
                 # meaningful error msg.
                 plpy.error("model_keras error: Input shape {0} in the model"
-                    " architecture does not match the input shape {1} of column"
-                    " {2} in table {3}.".format(
-                        input_shape, input_shape_from_table,
-                        independent_varname, table))
+                           " architecture does not match the input shape {1} of column"
+                           " {2} in table {3}.".format(
+                    input_shape, input_shape_from_table,
+                    independent_varname, table))
 
     @staticmethod
     def validate_model_arch_table(module_name, model_arch_table, model_id):
         input_tbl_valid(model_arch_table, module_name)
         _assert(model_id is not None,
-            "{0}: Invalid model architecture ID.".format(module_name))
+                "{0}: Invalid model architecture ID.".format(module_name))
 
 
     @staticmethod
@@ -176,9 +176,9 @@ class InputValidator:
                 "{0}: The number of class values do not match the " \
                 "provided architecture.".format(module_name))
         if pred_type == 'prob' and num_classes+1 >= 1600:
-            plpy.error({"{0}: The output will have {1} columns, exceeding the "\
-                " max number of columns that can be created (1600)".format(
-                    module_name, num_classes+1)})
+            plpy.error({"{0}: The output will have {1} columns, exceeding the " \
+                        " max number of columns that can be created (1600)".format(
+                module_name, num_classes+1)})
 
     @staticmethod
     def validate_model_weights(module_name, model_arch, model_weights):
@@ -235,14 +235,14 @@ class InputValidator:
         summary_table = add_postfix(source_table, "_summary")
         gpu_config = plpy.execute(
             "SELECT {0} FROM {1}".format(INTERNAL_GPU_CONFIG, summary_table)
-            )[0][INTERNAL_GPU_CONFIG]
+        )[0][INTERNAL_GPU_CONFIG]
         if gpu_config == 'all_segments':
             _assert(0 not in accessible_gpus_for_seg,
-                "{0} error: Host(s) are missing gpus.".format(module_name))
+                    "{0} error: Host(s) are missing gpus.".format(module_name))
         else:
             for i in gpu_config:
                 _assert(accessible_gpus_for_seg[i] != 0,
-                    "{0} error: Segment {1} does not have gpu".format(module_name, i))
+                        "{0} error: Segment {1} does not have gpu".format(module_name, i))
 
 class FitCommonValidator(object):
     def __init__(self, source_table, validation_table, output_model_table,
@@ -275,14 +275,14 @@ class FitCommonValidator(object):
         self._validate_common_args()
         if use_gpus:
             InputValidator._validate_gpu_config(self.module_name,
-                self.source_table, self.accessible_gpus_for_seg)
+                                                self.source_table, self.accessible_gpus_for_seg)
 
     def _validate_common_args(self):
         _assert(self.num_iterations > 0,
-            "{0}: Number of iterations cannot be < 1.".format(self.module_name))
+                "{0}: Number of iterations cannot be < 1.".format(self.module_name))
         _assert(self._is_valid_metrics_compute_frequency(),
-            "{0}: metrics_compute_frequency must be in the range (1 - {1}).".format(
-                self.module_name, self.num_iterations))
+                "{0}: metrics_compute_frequency must be in the range (1 - {1}).".format(
+                    self.module_name, self.num_iterations))
         input_tbl_valid(self.source_table, self.module_name)
         if self.object_table is not None:
             input_tbl_valid(self.object_table, self.module_name)
@@ -292,8 +292,8 @@ class FitCommonValidator(object):
                                          "has been preprocessed by "
                                          "the image preprocessor.".format(self.source_table))
         cols_in_tbl_valid(self.source_summary_table, [CLASS_VALUES_COLNAME,
-            NORMALIZING_CONST_COLNAME, DEPENDENT_VARTYPE_COLNAME,
-            'dependent_varname', 'independent_varname'], self.module_name)
+                                                      NORMALIZING_CONST_COLNAME, DEPENDENT_VARTYPE_COLNAME,
+                                                      'dependent_varname', 'independent_varname'], self.module_name)
         if not is_platform_pg():
             cols_in_tbl_valid(self.source_table, [DISTRIBUTION_KEY_COLNAME], self.module_name)
 
@@ -360,7 +360,7 @@ class FitCommonValidator(object):
     def _is_valid_metrics_compute_frequency(self):
         return self.metrics_compute_frequency is None or \
                (self.metrics_compute_frequency >= 1 and \
-               self.metrics_compute_frequency <= self.num_iterations)
+                self.metrics_compute_frequency <= self.num_iterations)
 
     def _validate_validation_table(self):
         if self.validation_table and self.validation_table.strip() != '':
@@ -376,7 +376,7 @@ class FitCommonValidator(object):
 
     def validate_input_shapes(self, input_shape):
         InputValidator.validate_input_shape(self.source_table, self.independent_varname,
-                               input_shape, 2, True)
+                                            input_shape, 2, True)
         if self.validation_table:
             InputValidator.validate_input_shape(
                 self.validation_table, self.independent_varname,
@@ -406,7 +406,7 @@ class FitInputValidator(FitCommonValidator):
                                                 self.module_name,
                                                 object_table)
         InputValidator.validate_model_arch_table(self.module_name, self.model_arch_table,
-            self.model_id)
+                                                 self.model_id)
 
 class FitMultipleInputValidator(FitCommonValidator):
     def __init__(self, source_table, validation_table, output_model_table,
@@ -422,7 +422,7 @@ class FitMultipleInputValidator(FitCommonValidator):
                         error_suffix_str="Please ensure that the model selection table ({0}) "
                                          "has been created by "
                                          "load_model_selection_table().".format(
-                                            model_selection_table))
+                            model_selection_table))
         self.msts, self.model_arch_table, self.object_table = query_model_configs(
             model_selection_table, model_selection_summary_table,
             mst_key_col, model_arch_table_col)
@@ -453,7 +453,8 @@ class MstLoaderInputValidator():
                  model_id_list,
                  compile_params_list,
                  fit_params_list,
-                 object_table
+                 object_table,
+                 module_name='load_model_selection_table'
                  ):
         self.model_arch_table = model_arch_table
         self.model_selection_table = model_selection_table
@@ -462,16 +463,17 @@ class MstLoaderInputValidator():
         self.compile_params_list = compile_params_list
         self.fit_params_list = fit_params_list
         self.object_table = object_table
-        self.module_name = 'load_model_selection_table'
+        self.module_name = module_name #'load_model_selection_table'
         self._validate_input_args()
 
     def _validate_input_args(self):
         self._validate_input_output_tables()
         self._validate_model_ids()
-        self._validate_compile_and_fit_params()
+        if self.module_name == 'load_model_selection_table':
+            self._validate_compile_and_fit_params()
 
     def _validate_model_ids(self):
-        model_id_str = '({0})'\
+        model_id_str = '({0})' \
             .format(','.join([str(x) for x in self.model_id_list]))
         query = """
             SELECT count(model_id)
@@ -522,11 +524,11 @@ class MstLoaderInputValidator():
                     error_suffix = "is not defined in object table '{0}'!".format(self.object_table)
 
                 _assert(res['loss'] in custom_fn_name or res['loss'] in builtin_losses,
-                        "custom function '{0}' used in compile params "\
+                        "custom function '{0}' used in compile params " \
                         "{1}".format(res['loss'], error_suffix))
                 if 'metrics' in res:
                     _assert((len(set(res['metrics']).intersection(custom_fn_name)) > 0
-                            or len(set(res['metrics']).intersection(builtin_metrics)) > 0),
+                             or len(set(res['metrics']).intersection(builtin_metrics)) > 0),
                             "custom function '{0}' used in compile params " \
                             "{1}".format(res['metrics'], error_suffix))
 
@@ -540,7 +542,6 @@ class MstLoaderInputValidator():
         input_tbl_valid(self.model_arch_table, self.module_name)
         if self.object_table is not None:
             input_tbl_valid(self.object_table, self.module_name)
-        output_tbl_valid(self.model_selection_table, self.module_name)
-        output_tbl_valid(self.model_selection_summary_table, self.module_name)
-
-
+        if self.module_name == 'load_model_selection_table':
+            output_tbl_valid(self.model_selection_table, self.module_name)
+            output_tbl_valid(self.model_selection_summary_table, self.module_name)
