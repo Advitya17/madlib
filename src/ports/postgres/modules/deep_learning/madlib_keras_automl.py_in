@@ -30,6 +30,9 @@ class AutoMLSchema:
     CONFIGURATIONS = 'n_i'
     RESOURCES = 'r_i'
     HYPERBAND = 'hyperband'
+    R = 'R'
+    ETA = 'eta'
+    SKIP_LAST = 'skip_last'
 
 
 @MinWarning("warning")
@@ -180,6 +183,8 @@ class KerasAutoML():
         self.automl_params = automl_params
         self.random_state = random_state
 
+        self.validate_inputs()
+
         self.object_table = object_table
         self.use_gpus = use_gpus
         self.validation_table = validation_table
@@ -196,6 +201,25 @@ class KerasAutoML():
         self.create_model_selection_summary_table()
 
     def validate_inputs(self):
+        # explicit checks for generate_model_configs function params here
+        # or during function call itself ?? TODO
+        # similarly for some multiple fit params
+        automl_params_dict = extract_keyvalue_params(automl_params)
+        if self.automl_method.startswith(AutoMLSchema.HYPERBAND):
+            _assert(len(automl_params_dict) >= 1 or len(automl_params_dict) <= 3,
+                    "DL: Only R, eta, and skip_last may be specified")
+            if AutoMLSchema.R in automl_params_dict:
+                self.R = automl_params_dict[AutoMLSchema.R]
+            else:
+                plpy.error("DL: R needs to be specified for hyperband")
+            if AutoMLSchema.ETA in automl_params_dict:
+                self.eta = automl_params_dict[AutoMLSchema.ETA]
+            else:
+                self.eta = 3 # default
+            if AutoMLSchema.SKIP_LAST in automl_params_dict:
+                self.skip_last = automl_params_dict[AutoMLSchema.SKIP_LAST]
+            else:
+                self.skip_last = 0 # default
 
     def find_hyperband_config(self):
 
