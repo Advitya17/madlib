@@ -147,8 +147,8 @@ $$ LANGUAGE plpythonu VOLATILE
 CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.madlib_keras_automl(
     source_table                   VARCHAR,
     model_output_table             VARCHAR,
-    model_selection_table          VARCHAR,
     model_arch_table               VARCHAR,
+    model_selection_table          VARCHAR,
     model_id_list                  INTEGER[],
     compile_params_grid            VARCHAR,
     fit_params_grid                VARCHAR,
