@@ -20,7 +20,7 @@
 import plpy
 import math
 
-from utilities.utilities import _assert
+from utilities.utilities import _assert, extract_keyvalue_params
 from utilities.control import MinWarning
 
 class AutoMLSchema:
@@ -28,6 +28,59 @@ class AutoMLSchema:
     ROUND = 'i'
     CONFIGURATIONS = 'n_i'
     RESOURCES = 'r_i'
+    HYPERBAND = 'hyperband'
+
+
+@MinWarning("warning")
+class KerasAutoML():
+    """TODO"""
+    def __init__(self, source_table, model_output_table, model_selection_table, model_arch_table,
+                 model_id_list, compile_params_grid, fit_params_grid, automl_method='hyperband',
+                 automl_params='R=81, eta=3, skip_last=0', random_state=None, object_table=None,
+                 use_gpus=False, validation_table=None, metrics_compute_frequency=None,
+                 name=None, description=None):
+        self.source_table = source_table
+        self.model_output_table = model_output_table
+        self.model_selection_table = model_selection_table
+        self.model_arch_table = model_arch_table
+        self.model_id_list = model_id_list
+        self.compile_params_grid = compile_params_grid
+        self.fit_params_grid = fit_params_grid
+        self.automl_method = automl_method
+        self.automl_params = automl_params
+        self.random_state = random_state
+        self.object_table = object_table
+        self.use_gpus = use_gpus
+        self.validation_table = validation_table
+        self.metrics_compute_frequency = metrics_compute_frequency
+        self.name = name
+        self.description = description
+
+
+
+    def load(self):
+        self.create_model_output_table()
+        self.create_model_output_summary_table()
+        self.create_model_output_info_table()
+        self.create_model_selection_table()
+        self.create_model_selection_summary_table()
+
+    def validate_inputs(self):
+
+    def find_hyperband_config(self):
+
+    def create_model_output_table(self):
+        pass
+    def create_model_output_summary_table(self):
+        pass
+    def create_model_output_info_table(self):
+        pass
+    def create_model_selection_table(self):
+        pass
+    def create_model_selection_summary_table(self):
+        pass
+
+
 
 @MinWarning("warning")
 class HyperbandSchedule():
