@@ -19,14 +19,14 @@
  *
  *//* ---------------------------------------------------------------------*/
 
-m4_include('SQLCommon.m4')
+m4_include(`SQLCommon.m4')
 
 --------------------------- HYPERBAND SCHEDULE TEST CASES ---------------------------
 -- Testing happy path with default values
 DROP TABLE IF EXISTS schedule_table;
 SELECT hyperband_schedule(
                'schedule_table',
-               '81'
+               81
         );
 SELECT assert(
     COUNT(*)=15,
@@ -38,7 +38,7 @@ FROM schedule_table;
 SELECT assert(trap_error($TRAP$
     SELECT hyperband_schedule(
                'schedule_table',
-               '81'
+               81
         );
 $TRAP$)=1, 'Should error out if schedule_table already exists');
 

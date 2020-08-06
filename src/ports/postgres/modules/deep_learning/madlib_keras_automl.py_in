@@ -21,6 +21,7 @@ import plpy
 import math
 
 from utilities.utilities import _assert
+from utilities.control import MinWarning
 
 class AutoMLSchema:
     BRACKET = 's'
@@ -49,6 +50,7 @@ class HyperbandSchedule():
 
         # number of unique executions of Successive Halving (minus one)
         self.s_max = int(math.floor(math.log(self.R, self.eta)))
+        self.validate_s_max()
         # total number of resources/iterations (without reuse) per execution of Succesive Halving (n,r)
         self.B = (self.s_max + 1) * self.R
 
@@ -69,22 +71,24 @@ class HyperbandSchedule():
         """
         _assert(self.eta > 1, "DL: eta must be greater than 1")
         _assert(self.R >= self.eta, "DL: R should not be less than eta")
-        _assert(self.skip_last > 0 and self.skip_last < self.s_max, "DL: skip_last must be " +
-                "greater than zero and less than {0}".format(self.s_max))
+
+    def validate_s_max(self):
+        _assert(self.skip_last >= 0 and self.skip_last < self.s_max+1, "DL: skip_last must be " +
+                "non-negative and less than {0}".format(self.s_max))
 
     def calculate_schedule(self):
         """
         Calculates the hyperband schedule (number of configs and allocated resources)
-        in each round of each bracket and skips the number of last rounds specified in `skip_last`
+        in each round of each bracket and skips the number of last rounds specified in 'skip_last'
         """
-        for s in reversed(range(s_max+1)):
-            n = int(math.ceil(int(B/self.R/(s+1))*math.pow(eta, s))) # initial number of configurations
-            r = self.R * math.pow(eta, -s)
+        for s in reversed(range(self.s_max+1)):
+            n = int(math.ceil(int(self.B/self.R/(s+1))*math.pow(self.eta, s))) # initial number of configurations
+            r = self.R * math.pow(self.eta, -s)
 
-            for i in range((s+1) - int(skip_last)):
+            for i in range((s+1) - int(self.skip_last)):
                 # Computing each of the
-                n_i = n*math.pow(eta, -i)
-                r_i = r*math.pow(eta, i)
+                n_i = n*math.pow(self.eta, -i)
+                r_i = r*math.pow(self.eta, i)
 
                 self.schedule_vals.append({AutoMLSchema.BRACKET: s,
                                            AutoMLSchema.ROUND: i,
@@ -130,8 +134,7 @@ class HyperbandSchedule():
                                 {sd_n_i},
                                 {sd_r_i}
                             )
-                           """.format(self=self,
-                                      s_col=AutoMLSchema.BRACKET,
+                           """.format(s_col=AutoMLSchema.BRACKET,
                                       i_col=AutoMLSchema.ROUND,
                                       n_i_col=AutoMLSchema.CONFIGURATIONS,
                                       r_i_col=AutoMLSchema.RESOURCES,

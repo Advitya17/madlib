@@ -26,7 +26,7 @@
  *
  *//* ----------------------------------------------------------------------- */
 
-m4_include('SQLCommon.m4')
+m4_include(`SQLCommon.m4')
 /**
 @addtogroup grp_keras_setup_model_selection TODO
 
@@ -132,15 +132,14 @@ TBD.
 */
 
 CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.hyperband_schedule(
-    schedule_table        VARCHAR,
-    R                     INTEGER,
-    eta                   INTEGER DEFAULT 3,
-    skip_last             INTEGER DEFAULT 0
+      schedule_table        VARCHAR,
+      r                     INTEGER,
+      eta                   INTEGER DEFAULT 3,
+      skip_last             INTEGER DEFAULT 0
 ) RETURNS VOID AS $$
-    PythonFunctionBodyOnly('deep_learning', 'madlib_keras_automl')
+    PythonFunctionBodyOnly(`deep_learning', `madlib_keras_automl')
     with AOControl(False):
-        schedule_loader = madlib_keras_automl.HyperbandSchedule(**globals())
+        schedule_loader = madlib_keras_automl.HyperbandSchedule(schedule_table, r, eta, skip_last)
         schedule_loader.load()
 $$ LANGUAGE plpythonu VOLATILE
-    m4_ifdef('__HAS_FUNCTION_PROPERTIES__', 'MODIFIES SQL DATA');
--- `__HAS_FUNCTION_PROPERTIES__', `MODIFIES SQL DATA', `'
+              m4_ifdef(`__HAS_FUNCTION_PROPERTIES__', `MODIFIES SQL DATA', `');
