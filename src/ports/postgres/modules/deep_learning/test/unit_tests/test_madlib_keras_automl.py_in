@@ -62,12 +62,11 @@ class HyperbandScheduleTestCase(unittest.TestCase):
             self.eta,
             self.skip_last
         )
-        print(generate_schedule.schedule_vals)
         s_max = int(math.floor(math.log(self.R, self.eta)))
         num_depths = int((s_max+1) * (s_max+2) / 2.0)
         self.assertEqual(num_depths, len(generate_schedule.schedule_vals))
 
-    def test_invalid_input_args(self):
+    def test_max_skip_last(self):
         self.skip_last = int(math.floor(math.log(self.R, self.eta)))+1 # s_max+1
         with self.assertRaises(plpy.PLPYException):
             generate_schedule = self.subject(
@@ -76,6 +75,16 @@ class HyperbandScheduleTestCase(unittest.TestCase):
                 self.eta,
                 self.skip_last
             )
+    def test_negative_skip_last(self):
+        self.skip_last = -3
+        with self.assertRaises(plpy.PLPYException):
+            generate_schedule = self.subject(
+                self.schedule_table,
+                self.R,
+                self.eta,
+                self.skip_last
+            )
+    def test_zero_resources(self):
         self.R = 0
         with self.assertRaises(plpy.PLPYException):
             generate_schedule = self.subject(
@@ -84,6 +93,7 @@ class HyperbandScheduleTestCase(unittest.TestCase):
                 self.eta,
                 self.skip_last
             )
+    def test_negative_resources(self):
         self.R = -3
         with self.assertRaises(plpy.PLPYException):
             generate_schedule = self.subject(
@@ -92,6 +102,7 @@ class HyperbandScheduleTestCase(unittest.TestCase):
                 self.eta,
                 self.skip_last
             )
+    def test_non_discarding_eta(self):
         self.eta = 1
         with self.assertRaises(plpy.PLPYException):
             generate_schedule = self.subject(
@@ -100,15 +111,8 @@ class HyperbandScheduleTestCase(unittest.TestCase):
                 self.eta,
                 self.skip_last
             )
+    def test_negative_eta(self):
         self.eta = -2
-        with self.assertRaises(plpy.PLPYException):
-            generate_schedule = self.subject(
-                self.schedule_table,
-                self.R,
-                self.eta,
-                self.skip_last
-            )
-        self.skip_last = -3
         with self.assertRaises(plpy.PLPYException):
             generate_schedule = self.subject(
                 self.schedule_table,
