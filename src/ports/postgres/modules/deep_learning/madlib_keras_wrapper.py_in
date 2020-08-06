@@ -190,7 +190,7 @@ def get_loss_from_compile_param(str_of_args):
     return loss
 
 # Parse the compile parameters and the optimizer.
-def parse_and_validate_compile_params(str_of_args):
+def parse_and_validate_compile_params(str_of_args, additional_params=[]):
     """
     Args:
         @param: str_of_args     The string of arguments given by the user
@@ -201,13 +201,15 @@ def parse_and_validate_compile_params(str_of_args):
     """
     literal_eval_compile_params = ['metrics', 'loss_weights',
                                    'weighted_metrics', 'sample_weight_mode']
-    accepted_compile_params = literal_eval_compile_params + ['optimizer', 'loss']
+    accepted_compile_params = literal_eval_compile_params + ['optimizer', 'loss'] + additional_params
 
     compile_dict = convert_string_of_args_to_dict(str_of_args)
     compile_dict = validate_and_literal_eval_keys(compile_dict,
                                                   literal_eval_compile_params,
                                                   accepted_compile_params)
-    _assert('optimizer' in compile_dict, "optimizer is a required parameter for compile")
+    if len(additional_params) == 0:
+        # optimizer is not a required parameter for keras compile
+        _assert('optimizer' in compile_dict, "optimizer is a required parameter for compile")
     opt_name, opt_args = parse_optimizer(compile_dict)
 
     _assert('loss' in compile_dict, "loss is a required parameter for compile")
@@ -217,18 +219,18 @@ def parse_and_validate_compile_params(str_of_args):
 
 def _validate_metrics(compile_dict):
     _assert('metrics' not in compile_dict.keys() or
-        compile_dict['metrics'] is None or
-        type(compile_dict['metrics']) is list,
-        "wrong input type for compile parameter metrics: multi-output model"
-        "and user defined metrics are not supported yet, please pass a list")
+            compile_dict['metrics'] is None or
+            type(compile_dict['metrics']) is list,
+            "wrong input type for compile parameter metrics: multi-output model"
+            "and user defined metrics are not supported yet, please pass a list")
     if 'metrics' in compile_dict and compile_dict['metrics']:
         unsupported_metrics_list = ['sparse_categorical_accuracy',
-            'sparse_categorical_crossentropy', 'top_k_categorical_accuracy',
-            'sparse_top_k_categorical_accuracy']
+                                    'sparse_categorical_crossentropy', 'top_k_categorical_accuracy',
+                                    'sparse_top_k_categorical_accuracy']
         _assert(len(compile_dict['metrics']) == 1,
-            "Only one metric at a time is supported.")
+                "Only one metric at a time is supported.")
         _assert(compile_dict['metrics'][0] not in unsupported_metrics_list,
-            "Metric {0} is not supported.".format(compile_dict['metrics'][0]))
+                "Metric {0} is not supported.".format(compile_dict['metrics'][0]))
 
 # Parse the optimizer name and params.
 def parse_optimizer(compile_dict):
@@ -276,7 +278,7 @@ def parse_and_validate_fit_params(fit_param_str):
         fit_params_dict = convert_string_of_args_to_dict(fit_param_str)
 
         literal_eval_fit_params = ['batch_size','epochs','verbose',
-                               'class_weight','initial_epoch','steps_per_epoch']
+                                   'class_weight','initial_epoch','steps_per_epoch']
         accepted_fit_params = literal_eval_fit_params + ['shuffle']
 
         fit_params_dict = validate_and_literal_eval_keys(fit_params_dict,
@@ -296,7 +298,7 @@ def parse_and_validate_fit_params(fit_param_str):
 def validate_and_literal_eval_keys(keys_dict, literal_eval_list, accepted_list):
     for ckey in keys_dict.keys():
         _assert(ckey in accepted_list,
-            "{0} is not currently accepted as a parameter. ".format(ckey))
+                "{0} is not currently accepted as a parameter. ".format(ckey))
         if ckey in literal_eval_list:
             try:
                 keys_dict[ckey] = ast.literal_eval(keys_dict[ckey])
