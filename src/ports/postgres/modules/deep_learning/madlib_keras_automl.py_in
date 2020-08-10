@@ -290,14 +290,14 @@ class KerasAutoML():
             temp_lst = []
             for s in range(self.s_max, self.s_max-i-1, -1):
                 n, r = initial_vals[s]
-                n_i = int(n * math.pow(self.eta, -i+self.s_max-s))
-                r_i = int(round(r * math.pow(self.eta, i-self.s_max+s)))
+                n_i = n * math.pow(self.eta, -i+self.s_max-s)
+                r_i = r * math.pow(self.eta, i-self.s_max+s))
 
                 # print ("s=" + str(s))
                 # print ("n_i=" + str(n_i))
                 # print ("r_i=" + str(r_i))
 
-                temp_lst.append("s={0},n_i={1},r_i={2}".format(s, n_i, r_i))
+                temp_lst.append("s={0},n_i={1},r_i={2}".format(s, int(n_i), int(round(r_i))))
                 # plpy.info("s={0},n_i={1},r_i={2}".format(s, n_i, r_i))
             plpy.info('\n' + '\n'.join(temp_lst))
 
