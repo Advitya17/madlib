@@ -153,18 +153,21 @@ CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.madlib_keras_automl(
     compile_params_grid            VARCHAR,
     fit_params_grid                VARCHAR,
     automl_method                  VARCHAR DEFAULT 'hyperband',
-    automl_params                  JSON DEFAULT 'R=81, eta=3, skip_last=0',
+    automl_params                  VARCHAR DEFAULT 'R=81, eta=3, skip_last=0',
     random_state                   INTEGER DEFAULT NULL,
     object_table                   VARCHAR DEFAULT NULL,
     use_gpus                       BOOLEAN DEFAULT FALSE,
     validation_table               VARCHAR DEFAULT NULL,
     metrics_compute_frequency      INTEGER DEFAULT NULL,
     name                           VARCHAR DEFAULT NULL,
-    description                    VARCHAR DEFAULT NULL,
+    description                    VARCHAR DEFAULT NULL
 ) RETURNS VOID AS $$
     PythonFunctionBodyOnly(`deep_learning', `madlib_keras_automl')
     with AOControl(False):
-        schedule_loader = madlib_keras_automl.KerasAutoML(**globals())
+        schedule_loader = madlib_keras_automl.KerasAutoML(source_table, model_output_table,
+        model_arch_table, model_selection_table, model_id_list, compile_params_grid, fit_params_grid,
+        automl_method, automl_params, random_state, object_table, use_gpus, validation_table,
+        metrics_compute_frequency, name, description)
         schedule_loader.load()
 $$ LANGUAGE plpythonu VOLATILE
     m4_ifdef(`__HAS_FUNCTION_PROPERTIES__', `MODIFIES SQL DATA', `');

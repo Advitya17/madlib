@@ -21,8 +21,10 @@ import plpy
 import math
 
 from madlib_keras_validator import MstLoaderInputValidator
-from utilities.utilities import _assert, extract_keyvalue_params
+from utilities.utilities import add_postfix, extract_keyvalue_params, _assert
 from utilities.control import MinWarning
+from madlib_keras_fit_multiple_model import FitMultipleModel
+from madlib_keras_model_selection import MstSearch
 
 class AutoMLSchema:
     BRACKET = 's'
@@ -168,6 +170,7 @@ class KerasAutoML():
         self.compile_params_grid = compile_params_grid
         self.fit_params_grid = fit_params_grid
 
+        # needed?
         MstLoaderInputValidator(
             model_arch_table=self.model_arch_table,
             model_selection_table=self.model_selection_table,
@@ -183,7 +186,7 @@ class KerasAutoML():
         self.automl_params = automl_params
         self.random_state = random_state
 
-        self.validate_inputs()
+        self.validate_and_define_inputs()
 
         self.object_table = object_table
         self.use_gpus = use_gpus
@@ -191,6 +194,9 @@ class KerasAutoML():
         self.metrics_compute_frequency = metrics_compute_frequency # default value TODO ?
         self.name = name
         self.description = description
+
+        if AutoMLSchema.HYPERBAND.startswith(self.automl_method.lower()):
+            self.find_hyperband_config()
 
 
     def load(self):
@@ -200,28 +206,100 @@ class KerasAutoML():
         self.create_model_selection_table()
         self.create_model_selection_summary_table()
 
-    def validate_inputs(self):
+    def validate_and_define_inputs(self):
         # explicit checks for generate_model_configs function params here
         # or during function call itself ?? TODO
         # similarly for some multiple fit params
-        automl_params_dict = extract_keyvalue_params(automl_params)
-        if self.automl_method.startswith(AutoMLSchema.HYPERBAND):
+        automl_params_dict = extract_keyvalue_params(self.automl_params,
+                                                     default_values={'R': 81, 'eta': 3, 'skip_last': 0},
+                                                     lower_case_names=False)
+        for i in automl_params_dict:
+            automl_params_dict[i] = int(automl_params_dict[i])
+        plpy.info(automl_params_dict)
+
+        if AutoMLSchema.HYPERBAND.startswith(self.automl_method.lower()):
             _assert(len(automl_params_dict) >= 1 or len(automl_params_dict) <= 3,
                     "DL: Only R, eta, and skip_last may be specified")
-            if AutoMLSchema.R in automl_params_dict:
-                self.R = automl_params_dict[AutoMLSchema.R]
-            else:
-                plpy.error("DL: R needs to be specified for hyperband")
-            if AutoMLSchema.ETA in automl_params_dict:
-                self.eta = automl_params_dict[AutoMLSchema.ETA]
-            else:
-                self.eta = 3 # default
-            if AutoMLSchema.SKIP_LAST in automl_params_dict:
-                self.skip_last = automl_params_dict[AutoMLSchema.SKIP_LAST]
-            else:
-                self.skip_last = 0 # default
+            if AutoMLSchema.R not in automl_params_dict:\
+                plpy.error("DL: 'R' needs to be specified in 'automl_params' for hyperband")
+            for i in automl_params_dict:
+                if i == AutoMLSchema.R:
+                    self.R = automl_params_dict[AutoMLSchema.R]
+                elif i == AutoMLSchema.ETA:
+                    self.eta = automl_params_dict[AutoMLSchema.ETA]
+                elif i == AutoMLSchema.SKIP_LAST:
+                    self.skip_last = automl_params_dict[AutoMLSchema.SKIP_LAST]
+                else:
+                    plpy.error("DL: {0} is an invalid param".format(i))
+            self.s_max = int(math.floor(math.log(self.R, self.eta)))
+            _assert(self.skip_last >= 0 and self.skip_last < self.s_max+1, "DL: skip_last must be " +
+                    "non-negative and less than {0}".format(self.s_max))
+            # total number of resources/iterations (without reuse) per execution of Succesive Halving (n,r)
+            self.B = (self.s_max + 1) * self.R
+        else:
+            plpy.error("DL: Only hyperband is supported as the automl method")
 
     def find_hyperband_config(self):
+        initial_vals = {}
+        n_vals = []
+        # get hyper parameter configs for each s
+        for s in reversed(range(self.s_max+1)):
+
+            n = int(math.ceil(int(self.B/self.R/(s+1))*math.pow(self.eta, s))) # initial number of configurations
+            r = self.R * math.pow(self.eta, -s) # initial number of iterations to run configurations for
+
+            initial_vals[s] = (n, r)
+            n_vals.append(n)
+
+            # print ("s=" + str(s))
+            # print ("n=" + str(n))
+            # print ("r=" + str(r))
+            # print (" ")
+
+        # print ("outer loop on diagonal:")
+        # outer loop on diagonal
+
+        # random_search = MstSearch(self.model_arch_table,
+        #           self.model_selection_table,
+        #           self.model_id_list,
+        #           self.compile_params_grid,
+        #           self.fit_params_grid,
+        #           search_type='random',
+        #           self.num_configs=sum(initial_vals.keys()),
+        #           self.random_state,
+        #           self.object_table)
+        # random_search.load() # for populating mst table
+
+        # grouping_query = "ALTER TABLE {self.model_selection_table} ADD COLUMN s_group VARCHAR;" \
+        # "INSERT INTO {self.model_selection_table} (s_group) SELECT CASE ".format(**locals())
+        # case_string = ""
+        # for s_val in range(self.s_max+1):
+        #     case_string += "WHEN mst_key >= {sum(n_vals[:s_val])+1} AND mst_key <= {sum(n_vals[:s_val+1])} " \
+        #                    "THEN {self.s_max - s_val} ".format(**locals())
+        # grouping_query += case_string + "END AS s_group FROM {self.model_selection_table};".format(**locals())
+        #
+        # plpy.execute(grouping_query)
+
+        for i in range((self.s_max+1) - int(self.skip_last)):
+            # print (" ")
+            # print ("i=" + str(i))
+            #
+            # print ("inner loop on s desc:")
+            # inner loop on s desc
+            plpy.info("----i={0}----".format(i))
+            temp_lst = []
+            for s in range(self.s_max, self.s_max-i-1, -1):
+                n, r = initial_vals[s]
+                n_i = int(n * math.pow(self.eta, -i+self.s_max-s))
+                r_i = int(round(r * math.pow(self.eta, i-self.s_max+s)))
+
+                # print ("s=" + str(s))
+                # print ("n_i=" + str(n_i))
+                # print ("r_i=" + str(r_i))
+
+                temp_lst.append("s={0},n_i={1},r_i={2}".format(s, n_i, r_i))
+                # plpy.info("s={0},n_i={1},r_i={2}".format(s, n_i, r_i))
+            plpy.info('\n' + '\n'.join(temp_lst))
 
     def create_model_output_table(self):
         pass
