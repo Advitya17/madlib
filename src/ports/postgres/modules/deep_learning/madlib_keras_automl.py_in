@@ -21,7 +21,7 @@ import plpy
 import math
 
 from madlib_keras_validator import MstLoaderInputValidator
-from utilities.utilities import add_postfix, extract_keyvalue_params, _assert
+from utilities.utilities import add_postfix, extract_keyvalue_params, _assert, _assert_equal
 from utilities.control import MinWarning
 from madlib_keras_fit_multiple_model import FitMultipleModel
 from madlib_keras_model_selection import MstSearch
@@ -35,6 +35,7 @@ class AutoMLSchema:
     R = 'R'
     ETA = 'eta'
     SKIP_LAST = 'skip_last'
+    LOSS_METRIC = 'training_loss_final'
 
 
 @MinWarning("warning")
@@ -59,8 +60,6 @@ class HyperbandSchedule():
         # number of unique executions of Successive Halving (minus one)
         self.s_max = int(math.floor(math.log(self.R, self.eta)))
         self.validate_s_max()
-        # total number of resources/iterations (without reuse) per execution of Succesive Halving (n,r)
-        self.B = (self.s_max + 1) * self.R
 
         self.schedule_vals = []
 
@@ -90,7 +89,7 @@ class HyperbandSchedule():
         in each round of each bracket and skips the number of last rounds specified in 'skip_last'
         """
         for s in reversed(range(self.s_max+1)):
-            n = int(math.ceil(int(self.B/self.R/(s+1))*math.pow(self.eta, s))) # initial number of configurations
+            n = int(math.ceil(int((self.s_max + 1)/(s+1))*math.pow(self.eta, s))) # initial number of configurations
             r = self.R * math.pow(self.eta, -s)
 
             for i in range((s+1) - int(self.skip_last)):
@@ -122,7 +121,7 @@ class HyperbandSchedule():
             plpy.execute(create_query)
 
     def insert_into_schedule_table(self):
-        """Insert every thing in self.schedule_vals into the output schedule table."""
+        """Insert everything in self.schedule_vals into the output schedule table."""
         for sd in self.schedule_vals:
             sd_s = sd[AutoMLSchema.BRACKET]
             sd_i = sd[AutoMLSchema.ROUND]
@@ -160,13 +159,14 @@ class KerasAutoML():
                  name=None, description=None):
         self.source_table = source_table
         self.model_output_table = model_output_table
-
+        if self.model_output_table:
+            self.model_info_table = add_postfix(self.original_model_output_table, '_info')
+            self.model_summary_table = add_postfix(self.original_model_output_table, '_summary')
         self.model_arch_table = model_arch_table
         self.model_selection_table = model_selection_table
         self.model_selection_summary_table = add_postfix(
             model_selection_table, "_summary")
         self.model_id_list = sorted(list(set(model_id_list)))
-
         self.compile_params_grid = compile_params_grid
         self.fit_params_grid = fit_params_grid
 
@@ -185,7 +185,6 @@ class KerasAutoML():
         self.automl_method = automl_method
         self.automl_params = automl_params
         self.random_state = random_state
-
         self.validate_and_define_inputs()
 
         self.object_table = object_table
@@ -195,16 +194,19 @@ class KerasAutoML():
         self.name = name
         self.description = description
 
+        if self.validation_table:
+            AutoMLSchema.LOSS_METRIC = 'validation_loss_final'
+
         if AutoMLSchema.HYPERBAND.startswith(self.automl_method.lower()):
             self.find_hyperband_config()
 
 
-    def load(self):
-        self.create_model_output_table()
-        self.create_model_output_summary_table()
-        self.create_model_output_info_table()
-        self.create_model_selection_table()
-        self.create_model_selection_summary_table()
+    # def load(self):
+    #     self.create_model_output_table()
+    #     self.create_model_output_summary_table()
+    #     self.create_model_output_info_table()
+    #     self.create_model_selection_table()
+    #     self.create_model_selection_summary_table()
 
     def validate_and_define_inputs(self):
         # explicit checks for generate_model_configs function params here
@@ -241,7 +243,6 @@ class KerasAutoML():
 
     def find_hyperband_config(self):
         initial_vals = {}
-        n_vals = []
         # get hyper parameter configs for each s
         for s in reversed(range(self.s_max+1)):
 
@@ -249,37 +250,17 @@ class KerasAutoML():
             r = self.R * math.pow(self.eta, -s) # initial number of iterations to run configurations for
 
             initial_vals[s] = (n, r)
-            n_vals.append(n)
 
-            # print ("s=" + str(s))
-            # print ("n=" + str(n))
-            # print ("r=" + str(r))
-            # print (" ")
-
-        # print ("outer loop on diagonal:")
-        # outer loop on diagonal
-
-        # random_search = MstSearch(self.model_arch_table,
-        #           self.model_selection_table,
-        #           self.model_id_list,
-        #           self.compile_params_grid,
-        #           self.fit_params_grid,
-        #           search_type='random',
-        #           self.num_configs=sum(initial_vals.keys()),
-        #           self.random_state,
-        #           self.object_table)
-        # random_search.load() # for populating mst table
-
-        # grouping_query = "ALTER TABLE {self.model_selection_table} ADD COLUMN s_group VARCHAR;" \
-        # "INSERT INTO {self.model_selection_table} (s_group) SELECT CASE ".format(**locals())
-        # case_string = ""
-        # for s_val in range(self.s_max+1):
-        #     case_string += "WHEN mst_key >= {sum(n_vals[:s_val])+1} AND mst_key <= {sum(n_vals[:s_val+1])} " \
-        #                    "THEN {self.s_max - s_val} ".format(**locals())
-        # grouping_query += case_string + "END AS s_group FROM {self.model_selection_table};".format(**locals())
+        # random_search = MstSearch(self.model_arch_table, self.model_selection_table, self.model_id_list,
+        #                           self.compile_params_grid, self.fit_params_grid, 'random',
+        #                           sum(initial_vals.keys()), self.random_state, self.object_table)
+        # random_search.load() # for populating mst table # TODO
         #
-        # plpy.execute(grouping_query)
+        # ranges_dict = self.mst_key_ranges_dict(initial_vals)
+        #
+        # temp_mot_name = 'temp_model_output_table'
 
+        # outer loop on diagonal
         for i in range((self.s_max+1) - int(self.skip_last)):
             # print (" ")
             # print ("i=" + str(i))
@@ -288,26 +269,193 @@ class KerasAutoML():
             # inner loop on s desc
             plpy.info("----i={0}----".format(i))
             temp_lst = []
+
+            configs_prune_lookup = {}
+
+
             for s in range(self.s_max, self.s_max-i-1, -1):
                 n, r = initial_vals[s]
                 n_i = n * math.pow(self.eta, -i+self.s_max-s)
-                r_i = r * math.pow(self.eta, i-self.s_max+s))
-
-                # print ("s=" + str(s))
-                # print ("n_i=" + str(n_i))
-                # print ("r_i=" + str(r_i))
+                # r_i = r * math.pow(self.eta, i-self.s_max+s)
+                configs_prune_lookup[s] = n_i
 
                 temp_lst.append("s={0},n_i={1},r_i={2}".format(s, int(n_i), int(round(r_i))))
-                # plpy.info("s={0},n_i={1},r_i={2}".format(s, n_i, r_i))
             plpy.info('\n' + '\n'.join(temp_lst))
+            # plpy.info("universal r={0}".format(int(initial_vals[self.s_max-i][1])))
 
-    def create_model_output_table(self):
-        pass
-    def create_model_output_summary_table(self):
-        pass
-    def create_model_output_info_table(self):
-        pass
+            # temp_mst_table = self.prune_and_construct_temp_mst_table(ranges_dict, configs_prune_lookup)
+            #
+            #
+            # model_training = FitMultipleModel(self.source_table, model_output_table=temp_mot_name, model_selection_table=temp_mst_table,
+            #                  num_iterations=int(initial_vals[self.s_max-i][1]), self.use_gpus, self.validation_table,
+            #                  self.metrics_compute_frequency, warm_start=True, self.name, self.description) # schema_madlib ?
+            #
+            # self.update_model_output_table(ranges_dict)
+            # self.update_model_output_info_table(ranges_dict)
+        # self.update_model_output_summary_table()
+
     def create_model_selection_table(self):
         pass
     def create_model_selection_summary_table(self):
+        pass
+
+    def create_model_output_table(self):
+        output_table_create_query = """
+                                    CREATE TABLE {self.model_output_table}
+                                    ({self.mst_key_col} INTEGER PRIMARY KEY,
+                                     {self.model_weights_col} BYTEA,
+                                     {self.model_arch_col} JSON)
+                                    """.format(self=self)
+        plpy.execute(output_table_create_query)
+
+    def create_model_output_info_table(self):
+        info_table_create_query = """
+                                  CREATE TABLE {self.model_info_table}
+                                  ({self.mst_key_col} INTEGER PRIMARY KEY,
+                                   {self.model_id_col} INTEGER,
+                                   {self.compile_params_col} TEXT,
+                                   {self.fit_params_col} TEXT,
+                                   model_type TEXT,
+                                   model_size DOUBLE PRECISION,
+                                   metrics_elapsed_time DOUBLE PRECISION[],
+                                   metrics_type TEXT[],
+                                   training_metrics_final DOUBLE PRECISION,
+                                   training_loss_final DOUBLE PRECISION,
+                                   training_metrics DOUBLE PRECISION[],
+                                   training_loss DOUBLE PRECISION[],
+                                   validation_metrics_final DOUBLE PRECISION,
+                                   validation_loss_final DOUBLE PRECISION,
+                                   validation_metrics DOUBLE PRECISION[],
+                                   validation_loss DOUBLE PRECISION[])
+                                       """.format(self=self)
+
+        plpy.execute(info_table_create_query)
+
+    def create_model_output_summary_table(self):
+
+        create_query = plpy.prepare("""
+                CREATE TABLE {self.model_summary_table} AS
+                SELECT
+                    $MAD${self.source_table}$MAD$::TEXT AS source_table,
+                    {self.validation_table}::TEXT AS validation_table,
+                    $MAD${self.model_output_table}$MAD$::TEXT AS model,
+                    $MAD${self.model_info_table}$MAD$::TEXT AS model_info,
+                    
+                    $MAD$ SELECT dependent_varname FROM {model_training.model_summary_table} 
+                    $MAD$::TEXT AS dependent_varname,
+                    $MAD$ SELECT independent_varname FROM {model_training.model_summary_table} 
+                    $MAD$::TEXT AS independent_varname,
+                    
+                    $MAD${self.model_arch_table}$MAD$::TEXT AS model_arch_table,
+                    $MAD${self.model_selection_table}$MAD$::TEXT AS model_selection_table,
+                    {self.automl_method}::TEXT AS automl_method,
+                    {self.automl_params}::TEXT AS automl_method,
+                    {self.random_state}::TEXT AS random_state,
+                    
+                    
+                    {self.object_table}::TEXT AS object_table,
+                    {self.use_gpus}::INTEGER AS use_gpus,
+                    {self.metrics_compute_frequency}::INTEGER AS metrics_compute_frequency,
+                    {name}::TEXT AS name,
+                    {descr}::TEXT AS description,
+                    
+                    '{self.start_training_time}'::TIMESTAMP AS start_training_time,
+                    '{self.end_training_time}'::TIMESTAMP AS end_training_time,
+                    
+                    '{self.version}'::TEXT AS madlib_version,
+                    
+                    SELECT num_classes FROM {model_training.model_summary_table} ::INTEGER AS num_classes,
+                    SELECT class_values_colname FROM {model_training.model_summary_table} AS {class_values_colname},
+                    $MAD$ SELECT dependent_vartype_colname FROM {model_training.model_summary_table} 
+                    $MAD$::TEXT AS {dependent_vartype_colname},
+                    SELECT normalizing_const_colname FROM {model_training.model_summary_table} 
+                    AS {normalizing_const_colname}
+            """.format(**locals()))
+        plpy.execute(create_query)
+        pass
+
+    def mst_key_ranges_dict(self, initial_vals):
+        d = {}
+        for s_val in initial_vals: # going from s_max to 0
+            if s_val == self.s_max:
+                d[s_val] = (1, initial_vals[s_val][0])
+            else:
+                d[s_val] = (initial_vals[s_val+1][0]+1, initial_vals[s_val+1][0]+initial_vals[s_val][0])
+        return d
+
+    def prune_and_construct_temp_mst_table(self, ranges_dict, configs_prune_lookup):
+        output_tbl_name = 'temp_mst_table'
+
+        plpy.execute("DROP TABLE IF NOT EXISTS {output_tbl_name}".format(**locals()))
+
+        if i == 0:
+            lower_bound, upper_bound = ranges_dict[self.s_max]
+            _assert_equal(len(ranges_dict), 1, "DL: invalid dictionary error")
+            query = "INSERT INTO {output_tbl_name} SELECT * FROM {self.model_selection_table} " \
+                    "WHERE mst_key >= {lower_bound} AND mst_key <= {upper_bound} " \
+                    "LIMIT {prune_condition_lookup[self.s_max]}".format(**locals())
+        else:
+            query = ""
+            for s_val in configs_prune_lookup:
+                lower_bound, upper_bound = ranges_dict[s_val]
+                query += "INSERT INTO {output_tbl_name} SELECT mst_key, model_id, compile_params, fit_params " \
+                         "FROM {self.model_info_table} WHERE mst_key >= {lower_bound} " \
+                         "AND mst_key <= {upper_bound} ORDER BY {AutoMLSchema.LOSS_METRIC} " \
+                         "LIMIT {configs_prune_lookup[s_val]};".format(**locals())
+                # possibly better optimization with previous temp mot table ?
+
+        plpy.execute(query)
+        return output_tbl_name
+
+    def update_model_output_table(self, ranges_dict):
+        # check instead of temp_mot_table
+
+        if i == 0:
+            plpy.execute("INSERT INTO {self.model_output_table} SELECT * FROM {model_training.model_output_table}")
+        else:
+            # inserts any newly trained configs
+            plpy.execute("INSERT INTO {self.model_output_table} a SELECT * FROM {model_training.model_output_table} t " \
+                         "WHERE t.mst_key NOT IN a.mst_key ".format(**locals()))
+
+            # updates model weights for further trained configs
+            plpy.execute("UPDATE {self.model_output_table} a SET a.model_weights=t.model_weights " \
+                         "FROM {model_training.model_output_table} t WHERE a.mst_key=t.mst_key".format(**locals()))
+
+
+    def update_model_output_info_table(self, ranges_dict):
+        # check instead of temp_mot_table+'_info'
+
+        if i == 0:
+            plpy.execute("INSERT INTO {self.model_info_table} SELECT * FROM {model_training.model_info_table}")
+        else:
+            # inserts info about metrics and validation for newly trained model configs
+            plpy.execute("INSERT INTO {self.model_info_table} a SELECT * FROM {model_training.model_info_table} t " \
+                         "WHERE t.mst_key NOT IN a.mst_key ".format(**locals()))
+
+            if self.validation_table:
+                # updates/appends info about training,validation,metrics values
+                plpy.execute("UPDATE {self.model_info_table} a SET " \
+                             "a.metrics_elapsed_time=a.metrics_elapsed_time+t.metrics_elapsed_time, " \
+                             "a.training_metrics_final=t.training_metrics_final, " \
+                             "a.training_loss_final=t.training_loss_final, " \
+                             "a.training_metrics= a.training_metrics+t.training_metrics, " \
+                             "a.training_loss= a.training_loss+t.training_loss, " \
+                             "a.validation_metrics_final=t.validation_metrics_final, " \
+                             "a.validation_loss_final=t.validation_loss_final, " \
+                             "a.validation_metrics= a.validation_metrics+t.validation_metrics, " \
+                             "a.validation_loss= a.validation_loss+t.validation_loss " \
+                             "FROM {model_training.model_info_table} t " \
+                             "WHERE a.mst_key=t.mst_key".format(**locals()))
+            else:
+                # updates/appends info about training,validation,metrics values
+                plpy.execute("UPDATE {self.model_info_table} a SET " \
+                             "a.metrics_elapsed_time=a.metrics_elapsed_time+t.metrics_elapsed_time, " \
+                             "a.training_metrics_final=t.training_metrics_final, " \
+                             "a.training_loss_final=t.training_loss_final, " \
+                             "a.training_metrics= a.training_metrics+t.training_metrics, " \
+                             "a.training_loss= a.training_loss+t.training_loss, " \
+                             "FROM {model_training.model_info_table} t " \
+                             "WHERE a.mst_key=t.mst_key".format(**locals()))
+
+    def update_model_output_summary_table(self):
         pass
