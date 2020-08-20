@@ -27,6 +27,7 @@
  *//* ----------------------------------------------------------------------- */
 
 m4_include(`SQLCommon.m4')
+
 /**
 @addtogroup grp_keras_setup_model_selection
 
@@ -49,6 +50,198 @@ By model selection we mean both hyperparameter tuning and
 model architecture search.  The table defines the unique combinations
 of model architectures, compile and fit parameters
 to run on a massively parallel processing database cluster.
+
+@addtogroup grp_keras_setup_model_selection
+
+@brief Utility function to generate configurations for model architecture search
+and hyperparameter tuning.
+
+\warning <em> This MADlib method is still in early stage development.
+Interface and implementation are subject to change. </em>
+
+<div class="toc"><b>Contents</b><ul>
+<li class="level1"><a href="#gen_mst_configs">Generate Model Configurations</a></li>
+<li class="level1"><a href="#load_mst_table">Load Model Selection Table [Deprecated]</a></li>
+<li class="level1"><a href="#example">Examples</a></li>
+<li class="level1"><a href="#notes">Notes</a></li>
+<li class="level1"><a href="#related">Related Topics</a></li>
+</ul></div>
+
+This module generates model configurations
+for training multiple models at the same time
+using <a href="group__grp__keras__run__model__selection.html">Run Model Selection</a>.
+By model configurations we mean both hyperparameters and
+model architectures. Grid search or random search
+can be used to generate the configurations.
+The output table from this module
+defines the combinations of model architectures,
+compile and fit parameters to be trained in parallel.
+
+<!-- --------------------------------------START-------------------------------------------------------------- -->
+@anchor gen_mst_configs
+@par Generate Model Configurations
+
+<pre class="syntax">
+generate_model_configs(
+    model_arch_table,
+    model_selection_table,
+    model_id_list,
+    compile_params_grid,
+    fit_params_grid,
+    search_type,
+    num_configs,
+    random_state,
+    object_table
+    )
+</pre>
+
+\b Arguments
+<dl class="arglist">
+  <dt>model_arch_table</dt>
+  <dd>VARCHAR. Table containing model architectures and weights.
+  For more information on this table
+  refer to the module <a href="group__grp__keras__model__arch.html">Load Models</a>.
+  </dd>
+
+  <dt>model_selection_table</dt>
+  <dd>VARCHAR. Model selection table created by this module.  A summary table
+  named <model_selection_table>_summary is also created.  Contents of both output
+  tables are described below.
+  </dd>
+
+  <dt>model_id_list</dt>
+  <dd>INTEGER[]. Array of model IDs from the 'model_arch_table' to be included
+  in the run combinations.  For hyperparameter search, this will typically be
+  one model ID.  For model architecture search, this will be the different model IDs
+  that you want to compare.
+  </dd>
+
+  <dt>compile_params_grid</dt>
+  <dd>VARCHAR. String representation of a Python dictionary
+  of compile parameters to be tested. Each entry
+  of the dictionary should consist of keys as compile parameter names,
+  and values as a Python list of compile parameter values to be passed to Keras.
+  Also, optimizer parameters are a nested dictionary to allow different
+  optimizer types to have different parameters or ranges of parameters.
+  Here is an example:
+
+  <pre class="example">
+  $$
+    {'loss': ['categorical_crossentropy'],
+     'optimizer_params_list': [
+        {'optimizer': ['SGD'], 'lr': [0.0001, 0.001, 'log'], 'momentum': [0.95, 0.99, 'log_near_one']},
+        {'optimizer': ['Adam'], 'lr': [0.01, 0.1, 'log'], 'decay': [1e-6, 1e-4, 'log']}],
+     'metrics': ['accuracy']
+    }
+  $$
+  </pre>
+
+  The following types of sampling are supported:  'linear', 'log' and 'log_near_one'.
+  The 'log_near_one' sampling is useful for exponentially weighted average types of parameters like momentum,
+  which are very sensitive to changes near 1.  It has the effect of producing more values near 1
+  than regular log-based sampling.
+
+  In the case of grid search, omit the sample type and just put the grid points in the list.
+  For custom loss functions or custom metrics,
+  list the custom function name in the usual way, and provide the name of the
+  table where the serialized Python objects reside using the
+  parameter 'object_table' below. See the examples section later on this page for more examples.
+  </dd>
+
+  <dt>fit_params_grid</dt>
+  <dd>VARCHAR.  String representation of a Python dictionary
+  of fit parameters to be tested. Each entry
+  of the dictionary should consist of keys as fit parameter names,
+  and values as a Python list of fit parameter values
+  to be passed to Keras. Here is an example:
+
+  <pre class="example">
+  $$
+    {'batch_size': [32, 64, 128, 256],
+     'epochs': [10, 20, 30]
+    }
+  $$
+  </pre>
+  See the examples section later on this page for more examples.
+  </dd>
+
+  <dt>search_type</dt>
+  <dd>VARCHAR, 'grid' or 'random'. Search strategy
+  for generating model configurations.  For grid search, will generate
+  all combinations of model IDs + compile params + fit params.  For
+  random search, specify the number of configs you want to
+  generate using the 'num_configs' parameter below.
+  Note that you can also use short forms
+  for the 'grid' or 'random' keywords, e.g.,'rand' or 'r' instead
+  of writing out 'random' in full.
+  </dd>
+
+  <dt>num_configs (optional)</dt>
+  <dd>INTEGER, default: NULL. Number of model configs to generate.
+  Only applies when search_type='random'.
+  </dd>
+
+  <dt>random_state (optional)</dt>
+  <dd>INTEGER, default: NULL.  Pseudo random number generator
+  state used for random uniform sampling from lists of possible
+  values. Pass an integer for reproducible output across multiple
+  function calls.  Only applies when search_type='random'.
+  </dd>
+
+  <dt>object_table (optional)</dt>
+  <dd>VARCHAR, default: NULL. Name of the table containing
+  Python objects in the case that custom loss functions or
+  custom metrics are specified in the 'compile_params_grid'.
+  </dd>
+
+</dl>
+
+<b>Output table</b>
+<br>
+    The model selection output table contains the following columns:
+    <table class="output">
+      <tr>
+        <th>mst_key</th>
+        <td>INTEGER. ID that defines a unique tuple for
+        model architecture-compile parameters-fit parameters.
+        </td>
+      </tr>
+      <tr>
+        <th>model_id</th>
+        <td>VARCHAR. Model architecture ID from the 'model_arch_table'.
+        </td>
+      </tr>
+      <tr>
+        <th>compile_params</th>
+        <td>VARCHAR. Keras compile parameters.
+        </td>
+      </tr>
+      <tr>
+        <th>fit_params</th>
+        <td>VARCHAR. Keras fit parameters.
+        </td>
+      </tr>
+    </table>
+    A summary table named <model_selection_table>_summary is
+    also created, which contains the following column:
+    <table class="output">
+      <tr>
+        <th>model_arch_table</th>
+        <td>VARCHAR. Name of the model architecture table containing the
+        model architecture IDs.
+        </td>
+      </tr>
+      <tr>
+        <th>object_table</th>
+        <td>VARCHAR. Name of the object table containing the serialized
+        Python objects for custom loss functions and custom metrics.
+        If there are none, this field will be blank.
+        </td>
+      </tr>
+    </table>
+</br>
+
+<!-- --------------------------------------END-------------------------------------------------------------- -->
 
 @anchor load_mst_table
 @par Load Model Selection Table
