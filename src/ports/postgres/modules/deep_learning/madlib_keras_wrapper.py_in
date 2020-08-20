@@ -210,7 +210,9 @@ def parse_and_validate_compile_params(str_of_args, additional_params=[]):
     if len(additional_params) == 0:
         # optimizer is not a required parameter for keras compile
         _assert('optimizer' in compile_dict, "optimizer is a required parameter for compile")
-    opt_name, opt_args = parse_optimizer(compile_dict)
+        opt_name, opt_args = parse_optimizer(compile_dict)
+    else:
+        opt_name, opt_args = None, None
 
     _assert('loss' in compile_dict, "loss is a required parameter for compile")
     validate_compile_param_types(compile_dict)

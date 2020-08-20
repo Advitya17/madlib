@@ -28,7 +28,7 @@
 
 m4_include(`SQLCommon.m4')
 /**
-@addtogroup grp_keras_setup_model_selection TODO
+@addtogroup grp_automl
 
 @brief Utility function to set up a model selection table for model architecture search
 and hyperparameter tuning.
@@ -144,6 +144,7 @@ CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.hyperband_schedule(
 $$ LANGUAGE plpythonu VOLATILE
               m4_ifdef(`__HAS_FUNCTION_PROPERTIES__', `MODIFIES SQL DATA', `');
 
+
 CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.madlib_keras_automl(
     source_table                   VARCHAR,
     model_output_table             VARCHAR,
@@ -164,10 +165,6 @@ CREATE OR REPLACE FUNCTION MADLIB_SCHEMA.madlib_keras_automl(
 ) RETURNS VOID AS $$
     PythonFunctionBodyOnly(`deep_learning', `madlib_keras_automl')
     with AOControl(False):
-        schedule_loader = madlib_keras_automl.KerasAutoML(source_table, model_output_table,
-        model_arch_table, model_selection_table, model_id_list, compile_params_grid, fit_params_grid,
-        automl_method, automl_params, random_state, object_table, use_gpus, validation_table,
-        metrics_compute_frequency, name, description)
-        schedule_loader.load()
+        schedule_loader = madlib_keras_automl.KerasAutoML(**globals())
 $$ LANGUAGE plpythonu VOLATILE
     m4_ifdef(`__HAS_FUNCTION_PROPERTIES__', `MODIFIES SQL DATA', `');
