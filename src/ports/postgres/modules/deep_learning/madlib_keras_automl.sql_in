@@ -27,16 +27,20 @@
  *//* ----------------------------------------------------------------------- */
 
 m4_include(`SQLCommon.m4')
+
 /**
 @addtogroup grp_automl
 
-@brief Utility function to set up a model selection table for model architecture search
-and hyperparameter tuning.
+
+@brief Functions to run automated machine learning (AutoML) algorithms to automate
+and speed-up the model selection and training processes for model architecture search,
+hyperparameter tuning, and model evaluation.
 
 \warning <em> This MADlib method is still in early stage development.
 Interface and implementation are subject to change. </em>
 
 <div class="toc"><b>Contents</b><ul>
+<li class="level1"><a href="#madlib_keras_automl">AutoML Function</a></li>
 <li class="level1"><a href="#hyperband_schedule">Hyperband Schedule</a></li>
 <li class="level1"><a href="#example">Examples</a></li>
 <li class="level1"><a href="#notes">Notes</a></li>
@@ -49,6 +53,132 @@ By configuration we mean both hyperparameter tuning and
 model architecture search.  The table defines the unique combinations
 of model architectures, compile and fit parameters
 to run on a massively parallel processing database cluster.
+
+@anchor madlib_keras_automl
+@par AutoML
+
+<pre class="syntax">
+madlib_keras_automl(
+    source_table,
+    model_output_table,
+    model_arch_table,
+    model_selection_table,
+    model_id_list,
+    compile_params_grid,
+    fit_params_grid,
+    automl_method='hyperband',
+    automl_params='R=81, eta=3, skip_last=0',
+    random_state=None,
+    object_table=None,
+    use_gpus=False,
+    validation_table=None,
+    metrics_compute_frequency=None,
+    name=None,
+    description=None
+    )
+</pre>
+
+\b Arguments
+<dl class="arglist">
+  <dt>source_table</dt>
+  <dd>TEXT. Name of the table containing the training data.
+  This is the name of the output table from the image preprocessor. Independent
+  and dependent variables are specified in the preprocessor
+  step which is why you do not need to explictly state
+  them here as part of the fit function.
+  </dd>
+
+  <dt>model_output_table</dt>
+  <dd>TEXT. Name of the output table containing the
+  multiple models created.
+  @note pg_temp is not allowed as an output table schema for fit multiple.
+  Details of output tables are shown below.
+  </dd>
+
+  <dt>model_arch_table</dt>
+  <dd>VARCHAR. Table containing model architectures and weights.
+  For more information on this table
+  refer to <a href="group__grp__keras__model__arch.html">Load Model</a>.
+  </dd>
+
+  <dt>model_selection_table</dt>
+  <dd>VARCHAR. Model selection table created by this utility.  A summary table
+  named <model_selection_table>_summary is also created.  Contents of both output
+  tables are described below.
+  </dd>
+
+  <dt>model_id_list</dt>
+  <dd>INTEGER[]. Array of model IDs from the 'model_arch_table' to be included
+  in the run combinations.  For hyperparameter search, this will typically be
+  one model ID.  For model architecture search, this will be the different model IDs
+  that you want to test.
+  </dd>
+
+  <dt>compile_params_list</dt>
+  <dd>VARCHAR[]. Array of compile parameters to be tested.  Each element
+  of the array should consist of a string of compile parameters
+  exactly as it is to be passed to Keras. For custom loss functions or custom metrics,
+  list the custom function name in the usual way, and also provide the name of the
+  table where the serialized objects reside in the parameter 'object_table'
+  below.
+  </dd>
+
+  <dt>fit_params_list</dt>
+  <dd>VARCHAR[].  Array of fit parameters to be tested.  Each element
+  of the array should consist of a string of fit parameters
+  exactly as it is to be passed to Keras.
+  </dd>
+
+  <dt>schedule_table</dt>
+  <dd>VARCHAR. Name of output table containing hyperband schedule.
+  </dd>
+
+  <dt>R</dt>
+  <dd>INTEGER. Maximum number of resources (iterations) that can be allocated
+  to a single configuration.
+  </dd>
+
+  <dt>eta</dt>
+  <dd>INTEGER, default 3. Controls the proportion of configurations discarded in
+  each round of successive halving. For example, for eta=3 will keep the best 1/3
+  the configurations for the next round.
+  </dd>
+
+  <dt>skip_last</dt>
+  <dd>INTEGER, default 0. The number of last rounds to skip. For example, for skip_last=1 will skip the
+  last round (i.e., last entry in each bracket), which is standard randomized search and can
+  be expensive when run for the total R iterations.
+  </dd>
+
+</dl>
+
+<b>Output table</b>
+<br>
+    The hyperband schedule output table contains the following columns:
+    <table class="output">
+      <tr>
+        <th>s</th>
+        <td>INTEGER. Bracket number
+        </td>
+      </tr>
+      <tr>
+        <th>i</th>
+        <td>INTEGER. Round (depth) in bracket
+        </td>
+      </tr>
+      <tr>
+        <th>n_i</th>
+        <td>INTEGER. Number of configurations in this round
+        </td>
+      </tr>
+      <tr>
+        <th>r_i</th>
+        <td>INTEGER. Resources (iterations) in this round
+        </td>
+      </tr>
+    </table>
+</br>
+
 
 @anchor hyperband_schedule
 @par Hyperband Schedule

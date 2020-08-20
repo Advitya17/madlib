@@ -270,6 +270,8 @@ class KerasAutoML():
                     self.skip_last = automl_params_dict[AutoMLSchema.SKIP_LAST]
                 else:
                     plpy.error("DL: {0} is an invalid param".format(i))
+            _assert(self.eta > 1, "DL: eta must be greater than 1")
+            _assert(self.R >= self.eta, "DL: R should not be less than eta")
             self.s_max = int(math.floor(math.log(self.R, self.eta)))
             _assert(self.skip_last >= 0 and self.skip_last < self.s_max+1, "DL: skip_last must be " +
                     "non-negative and less than {0}".format(self.s_max))

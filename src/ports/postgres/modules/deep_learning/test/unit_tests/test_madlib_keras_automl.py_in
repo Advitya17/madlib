@@ -31,6 +31,354 @@ import unittest
 from mock import *
 import plpy_mock as plpy
 
+class MadlibKerasAutoMLHyperbandTestCase(unittest.TestCase):
+    def setUp(self):
+        # The side effects of this class(writing to the output table) are not
+        # tested here. They are tested in dev-check.
+        self.plpy_mock = Mock(spec='error')
+        patches = {
+            'plpy': plpy
+        }
+
+        self.plpy_mock_execute = MagicMock()
+        plpy.execute = self.plpy_mock_execute
+
+        self.module_patcher = patch.dict('sys.modules', patches)
+        self.module_patcher.start()
+        import deep_learning.madlib_keras_automl
+        self.module = deep_learning.madlib_keras_automl
+
+        self.subject = self.module.KerasAutoML
+
+        self.schema_madlib = 'madlib'
+        self.source_table = 'iris_train_packed'
+        self.model_output_table = 'automl_output'
+        self.model_arch_table = 'model_arch_library'
+        self.model_selection_table = 'automl_mst_table'
+        self.model_id_list = [1, 2]
+        self.compile_params_grid = """
+            {'loss': ['categorical_crossentropy'],
+             'optimizer_params_list': [
+                {'optimizer': ['Adagrad', 'Adam'], 'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']},
+                {'optimizer': ['Adam', 'SGD'], 'lr': [0.6, 0.65, 'log']}
+             ],
+             'metrics':['accuracy']}
+        """
+        self.fit_params_grid = """{'batch_size': [2, 4], 'epochs': [3]}"""
+        self.automl_method = 'hyperband'
+        self.automl_params = 'R=9, eta=3, skip_last=0'
+        self.random_state = None
+        self.object_table = None
+        self.use_gpus = False
+        self.validation_table = None
+        self.metrics_compute_frequency = None
+        self.name = None
+        self.description = None
+
+    # def test_table_dimensions(self):
+    #     run_hyperband = self.subject(
+    #         self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+    #         self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+    #         self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+    #         self.validation_table, self.metrics_compute_frequency, self.name, self.description
+    #     )
+    #     q1 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_selection_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(1, len(q1[0]['cnt']))
+    #
+    #     q2 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_selection_summary_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(1, len(q2[0]['cnt']))
+    #
+    #     q3 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_summary_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(1, len(q3[0]['cnt']))
+    #
+    #     q4 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_output_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(15, len(q4[0]['cnt']))
+    #
+    #     q5 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_info_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(15, len(q5[0]['cnt']))
+
+    def test_invalid_source_table(self):
+        self.source_table = 'invalid_source_table'
+        with self.assertRaises(plpy.PLPYException):
+            run_hyperband = self.subject(
+                self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+                self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+                self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+                self.validation_table, self.metrics_compute_frequency, self.name, self.description
+            )
+
+    def test_preexisting_output_table(self):
+        run_hyperband = self.subject(
+            self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+            self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+            self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+            self.validation_table, self.metrics_compute_frequency, self.name, self.description
+        )
+        drop_tables([run_hyperband.model_selection_table, run_hyperband.model_selection_summary_table])
+        with self.assertRaises(plpy.PLPYException):
+            run_hyperband = self.subject(
+                self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+                self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+                self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+                self.validation_table, self.metrics_compute_frequency, self.name, self.description
+            )
+
+    def test_invalid_arch_table(self):
+        self.model_arch_table = 'invalid_arch_table'
+        with self.assertRaises(plpy.PLPYException):
+            run_hyperband = self.subject(
+                self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+                self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+                self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+                self.validation_table, self.metrics_compute_frequency, self.name, self.description
+            )
+
+    def test_preexisting_selection_table(self):
+        run_hyperband = self.subject(
+            self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+            self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+            self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+            self.validation_table, self.metrics_compute_frequency, self.name, self.description
+        )
+        drop_tables([run_hyperband.model_output_table, run_hyperband.model_summary_table,
+                     run_hyperband.model_info_table])
+        with self.assertRaises(plpy.PLPYException):
+            run_hyperband = self.subject(
+                self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+                self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+                self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+                self.validation_table, self.metrics_compute_frequency, self.name, self.description
+            )
+
+    def test_invalid_model_id(self):
+        self.model_id_list = [2, -1]
+        with self.assertRaises(plpy.PLPYException):
+            run_hyperband = self.subject(
+                self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+                self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+                self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+                self.validation_table, self.metrics_compute_frequency, self.name, self.description
+            )
+
+    def test_invalid_automl_method(self):
+        self.automl_method = 'hyperbrand'
+        with self.assertRaises(plpy.PLPYException):
+            run_hyperband = self.subject(
+                self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+                self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+                self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+                self.validation_table, self.metrics_compute_frequency, self.name, self.description
+            )
+        self.automl_method = 'hb'
+        with self.assertRaises(plpy.PLPYException):
+            run_hyperband = self.subject(
+                self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+                self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+                self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+                self.validation_table, self.metrics_compute_frequency, self.name, self.description
+            )
+    def test_invalid_automl_params(self):
+        self.automl_params = 'R=2, eta=3, skip_last=0'
+        with self.assertRaises(plpy.PLPYException):
+            run_hyperband = self.subject(
+                self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+                self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+                self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+                self.validation_table, self.metrics_compute_frequency, self.name, self.description
+            )
+        self.automl_params = 'R=0, eta=3, skip_last=0'
+        with self.assertRaises(plpy.PLPYException):
+            run_hyperband = self.subject(
+                self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+                self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+                self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+                self.validation_table, self.metrics_compute_frequency, self.name, self.description
+            )
+        self.automl_params = 'R=9, eta=1, skip_last=0'
+        with self.assertRaises(plpy.PLPYException):
+            run_hyperband = self.subject(
+                self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+                self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+                self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+                self.validation_table, self.metrics_compute_frequency, self.name, self.description
+            )
+        self.automl_params = 'R=9, eta=3, skip_last=3'
+        with self.assertRaises(plpy.PLPYException):
+            run_hyperband = self.subject(
+                self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+                self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+                self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+                self.validation_table, self.metrics_compute_frequency, self.name, self.description
+            )
+    def test_invalid_object_table(self):
+        self.object_table = 'invalid_object_table'
+        with self.assertRaises(plpy.PLPYException):
+            run_hyperband = self.subject(
+                self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+                self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+                self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+                self.validation_table, self.metrics_compute_frequency, self.name, self.description
+            )
+    def test_invalid_validation_table(self):
+        self.validation_table = 'invalid_validation_table'
+        with self.assertRaises(plpy.PLPYException):
+            run_hyperband = self.subject(
+                self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+                self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+                self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+                self.validation_table, self.metrics_compute_frequency, self.name, self.description
+            )
+
+    # def test_training_loss_comparison(self):
+    #     pass # sql test cases! # ensure loss of chosen config is min
+    #
+    # def test_validation_loss_comparison(self):
+    #     pass # sql test cases! # ensure loss of chosen config is min
+    #
+    # def test_automl_method(self):
+    #     self.automl_method = 'hyper'
+    #     run_hyperband = self.subject(
+    #         self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+    #         self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+    #         self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+    #         self.validation_table, self.metrics_compute_frequency, self.name, self.description
+    #     )
+    #     q4 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_output_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(15, len(q4[0]['cnt']))
+    #     q5 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_info_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(15, len(q5[0]['cnt']))
+    #
+    #     self.automl_method = 'hyp'
+    #     run_hyperband = self.subject(
+    #         self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+    #         self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+    #         self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+    #         self.validation_table, self.metrics_compute_frequency, self.name, self.description
+    #     )
+    #     q4 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_output_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(15, len(q4[0]['cnt']))
+    #     q5 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_info_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(15, len(q5[0]['cnt']))
+    #
+    # def test_different_R(self):
+    #     self.automl_params = 'R = 10, eta=3, skip_last=0'
+    #     run_hyperband = self.subject(
+    #         self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+    #         self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+    #         self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+    #         self.validation_table, self.metrics_compute_frequency, self.name, self.description
+    #     )
+    #     q4 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_output_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(15, len(q4[0]['cnt']))
+    #     q5 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_info_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(15, len(q5[0]['cnt']))
+    #
+    #     self.automl_params = 'R=5, eta=3, skip_last=0'
+    #     run_hyperband = self.subject(
+    #         self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+    #         self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+    #         self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+    #         self.validation_table, self.metrics_compute_frequency, self.name, self.description
+    #     )
+    #     q4 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_output_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(5, len(q4[0]['cnt']))
+    #     q5 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_info_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(5, len(q5[0]['cnt']))
+    #
+    #
+    # def test_different_eta(self):
+    #     self.automl_params = 'R = 10, eta=4, skip_last=1'
+    #     run_hyperband = self.subject(
+    #         self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+    #         self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+    #         self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+    #         self.validation_table, self.metrics_compute_frequency, self.name, self.description
+    #     )
+    #     q4 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_output_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(4, len(q4[0]['cnt']))
+    #     q5 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_info_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(4, len(q5[0]['cnt']))
+    #
+    #     self.automl_params = 'R=5, eta=5, skip_last=0'
+    #     run_hyperband = self.subject(
+    #         self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+    #         self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+    #         self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+    #         self.validation_table, self.metrics_compute_frequency, self.name, self.description
+    #     )
+    #     q4 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_output_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(7, len(q4[0]['cnt']))
+    #     q5 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_info_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(7, len(q5[0]['cnt']))
+    #
+    # def test_different_skip_last(self):
+    #     self.automl_params = 'R=9, eta=3, skip_last=2'
+    #     run_hyperband = self.subject(
+    #         self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+    #         self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+    #         self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+    #         self.validation_table, self.metrics_compute_frequency, self.name, self.description
+    #     )
+    #     q4 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_output_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(9, len(q4[0]['cnt']))
+    #     q5 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_info_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(9, len(q5[0]['cnt']))
+    #
+    #     self.automl_params = 'R=11, eta=2, skip_last=3'
+    #     run_hyperband = self.subject(
+    #         self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+    #         self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+    #         self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+    #         self.validation_table, self.metrics_compute_frequency, self.name, self.description
+    #     )
+    #     q4 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_output_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(8, len(q4[0]['cnt']))
+    #     q5 = plpy.execute("SELECT COUNT(*) cnt FROM {run_hyperband.model_info_table}".format(
+    #         run_hyperband=run_hyperband))
+    #     self.assertEqual(8, len(q5[0]['cnt']))
+    # def test_name_and_description(self):
+    #     self.name = 'test1'
+    #     run_hyperband = self.subject(
+    #         self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+    #         self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+    #         self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+    #         self.validation_table, self.metrics_compute_frequency, self.name, self.description
+    #     )
+    #     self.assertEqual(plpy.execute("SELECT name FROM {run_hyperband.model_summary_table}".format(
+    #         run_hyperband=run_hyperband))[0]['name'], self.name)
+    #     self.description = 'test1 descript.'
+    #     run_hyperband = self.subject(
+    #         self.schema_madlib, self.source_table, self.model_output_table, self.model_arch_table,
+    #         self.model_selection_table, self.model_id_list, self.compile_params_grid, self.fit_params_grid,
+    #         self.automl_method, self.automl_params, self.random_state, self.object_table, self.use_gpus,
+    #         self.validation_table, self.metrics_compute_frequency, self.name, self.description
+    #     )
+    #     self.assertEqual(plpy.execute("SELECT description FROM {run_hyperband.model_summary_table}".format(
+    #         run_hyperband=run_hyperband))[0]['description'], self.description)
+
+    def tearDown(self):
+        self.module_patcher.stop()
+
 class HyperbandScheduleTestCase(unittest.TestCase):
     def setUp(self):
         # The side effects of this class(writing to the output table) are not
