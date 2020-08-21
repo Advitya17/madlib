@@ -26,7 +26,8 @@ m4_include(`SQLCommon.m4')
               `\1../../modules/deep_learning/test/madlib_keras_iris.setup.sql_in'
 )
 
-
+m4_changequote(`<!', `!>')
+m4_ifdef(<!__POSTGRESQL__!>, <!!>, <!
 
 --------------------------- MADLIB KERAS AUTOML HYPERBAND TEST CASES ---------------------------
 
@@ -381,4 +382,4 @@ SELECT assert(trap_error($TRAP$
                81
         );
 $TRAP$)=1, 'Should error out if schedule_table already exists');
-
+!>)
