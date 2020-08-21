@@ -425,8 +425,8 @@ class KerasAutoML():
 
         # casting same metrics_iters values for the fit_multiple run with the chosen configs
         # in order to update overall info table later
-        plpy.execute("ALTER TABLE {model_training.model_info_table} ADD COLUMN {AutoMLSchema.METRICS_ITERS} INTEGER[]; " \
-                     "UPDATE {model_training.model_info_table} SET {AutoMLSchema.METRICS_ITERS} = "
+        plpy.execute("ALTER TABLE {model_training.model_info_table} ADD COLUMN {AutoMLSchema.METRICS_ITERS} INTEGER[]")
+        plpy.execute("UPDATE {model_training.model_info_table} SET {AutoMLSchema.METRICS_ITERS} = " \
                      "ARRAY{metrics_iters_val}::INTEGER[] FROM {model_training.model_summary_table}".format(
             model_training=model_training, metrics_iters_val=metrics_iters_val, AutoMLSchema=AutoMLSchema))
         validation_update_q = "validation_metrics_final=t.validation_metrics_final, " \
