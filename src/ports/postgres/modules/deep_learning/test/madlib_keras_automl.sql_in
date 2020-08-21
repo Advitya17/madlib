@@ -31,14 +31,14 @@ m4_include(`SQLCommon.m4')
 --------------------------- MADLIB KERAS AUTOML HYPERBAND TEST CASES ---------------------------
 
 DROP TABLE IF EXISTS iris_train_packed, iris_train_packed_summary;
-SELECT madlib.training_preprocessor_dl('iris_train',         -- Source table
+SELECT training_preprocessor_dl('iris_train',         -- Source table
                                        'iris_train_packed',  -- Output table
                                        'class_text',         -- Dependent variable
                                        'attributes'          -- Independent variable
            );
 
 DROP TABLE IF EXISTS iris_test_packed, iris_test_packed_summary;
-SELECT madlib.validation_preprocessor_dl('iris_test',          -- Source table
+SELECT validation_preprocessor_dl('iris_test',          -- Source table
                                          'iris_test_packed',   -- Output table
                                          'class_text',         -- Dependent variable
                                          'attributes',         -- Independent variable
@@ -49,7 +49,7 @@ SELECT madlib.validation_preprocessor_dl('iris_test',          -- Source table
 -- test table dimensions / happy path
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$);
@@ -64,7 +64,7 @@ SELECT assert(COUNT(*)=5, 'The length of table does not match with the inputs') 
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
 SELECT assert(trap_error($TRAP$
-    SELECT madlib.madlib_keras_automl('invalid_source_table', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+    SELECT madlib_keras_automl('invalid_source_table', 'automl_output', 'iris_model_arch', 'automl_mst_table',
         ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
         'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
         'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -74,7 +74,7 @@ $TRAP$)=1, 'Should error out for invalid source table');
 -- test preexisting output table
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -82,7 +82,7 @@ SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_mo
 
 DROP TABLE IF EXISTS automl_mst_table, automl_mst_table_summary;
 SELECT assert(trap_error($TRAP$
-    SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+    SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
         ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
         'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
         'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -92,7 +92,7 @@ $TRAP$)=1, 'Should error out for preexisting output table');
 -- test preexisting selection table
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -100,7 +100,7 @@ SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_mo
 
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary;
 SELECT assert(trap_error($TRAP$
-    SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+    SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
         ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
         'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
         'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -111,7 +111,7 @@ $TRAP$)=1, 'Should error out for preexisting selection table');
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
 SELECT assert(trap_error($TRAP$
-    SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+    SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
         ARRAY[2,-1], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
         'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
         'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -122,7 +122,7 @@ $TRAP$)=1, 'Should error out for invalid model id');
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
 SELECT assert(trap_error($TRAP$
-    SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+    SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -132,7 +132,7 @@ $TRAP$)=1, 'Should error out for invalid automl method');
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
 SELECT assert(trap_error($TRAP$
-    SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+    SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -143,7 +143,7 @@ $TRAP$)=1, 'Should error out for invalid automl method');
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
 SELECT assert(trap_error($TRAP$
-    SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+    SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
         ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
         'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
         'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -153,7 +153,7 @@ $TRAP$)=1, 'Should error out for invalid automl params');
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
 SELECT assert(trap_error($TRAP$
-    SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+    SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -163,7 +163,7 @@ $TRAP$)=1, 'Should error out for invalid automl params');
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
 SELECT assert(trap_error($TRAP$
-    SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+    SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -173,7 +173,7 @@ $TRAP$)=1, 'Should error out for invalid automl params');
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
 SELECT assert(trap_error($TRAP$
-    SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+    SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -184,7 +184,7 @@ $TRAP$)=1, 'Should error out for invalid automl params');
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
 SELECT assert(trap_error($TRAP$
-    SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+    SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
         ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
         'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
         'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -195,7 +195,7 @@ $TRAP$)=1, 'Should error out for invalid object table');
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
 SELECT assert(trap_error($TRAP$
-    SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+    SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
         ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
         'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
         'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -205,7 +205,7 @@ $TRAP$)=1, 'Should error out for invalid validation table');
 -- test automl_method val
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -219,7 +219,7 @@ SELECT assert(COUNT(*)=15, 'The length of table does not match with the inputs')
 
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -234,7 +234,7 @@ SELECT assert(COUNT(*)=15, 'The length of table does not match with the inputs')
 -- test automl_params vals {R, eta, skip_last}
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -248,7 +248,7 @@ SELECT assert(COUNT(*)=15, 'The length of table does not match with the inputs')
 
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -262,7 +262,7 @@ SELECT assert(COUNT(*)=5, 'The length of table does not match with the inputs') 
 
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -276,7 +276,7 @@ SELECT assert(COUNT(*)=4, 'The length of table does not match with the inputs') 
 
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -290,7 +290,7 @@ SELECT assert(COUNT(*)=7, 'The length of table does not match with the inputs') 
 
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -304,7 +304,7 @@ SELECT assert(COUNT(*)=9, 'The length of table does not match with the inputs') 
 
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -319,7 +319,7 @@ SELECT assert(COUNT(*)=8, 'The length of table does not match with the inputs') 
 -- test name and description
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
     automl_mst_table_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
+SELECT madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -330,7 +330,7 @@ SELECT assert(name='test1' AND description='test1 descr',
 -- test config reproducibility
 DROP TABLE IF EXISTS automl_output1, automl_output1_info, automl_output1_summary, automl_mst_table1,
     automl_mst_table1_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output1', 'iris_model_arch', 'automl_mst_table1',
+SELECT madlib_keras_automl('iris_train_packed', 'automl_output1', 'iris_model_arch', 'automl_mst_table1',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -338,7 +338,7 @@ SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output1', 'iris_m
 
 DROP TABLE IF EXISTS automl_output2, automl_output2_info, automl_output2_summary, automl_mst_table2,
     automl_mst_table2_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output2', 'iris_model_arch', 'automl_mst_table2',
+SELECT madlib_keras_automl('iris_train_packed', 'automl_output2', 'iris_model_arch', 'automl_mst_table2',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
@@ -346,7 +346,7 @@ SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output2', 'iris_m
 
 DROP TABLE IF EXISTS automl_output3, automl_output3_info, automl_output3_summary, automl_mst_table3,
     automl_mst_table3_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output3', 'iris_model_arch', 'automl_mst_table3',
+SELECT madlib_keras_automl('iris_train_packed', 'automl_output3', 'iris_model_arch', 'automl_mst_table3',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
     'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
