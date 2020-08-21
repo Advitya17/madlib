@@ -293,7 +293,7 @@ class MstSearch():
             # else should also suffice as random search is established.
             self.find_random_combinations()
 
-        #################
+        # param checks and validation
         compile_params_lst, fit_params_lst = [], []
         for i in self.msts:
             compile_params_lst.append(i[ModelSelectionSchema.COMPILE_PARAMS])
@@ -329,9 +329,9 @@ class MstSearch():
         """
 
         for c in self.compile_params_dict:
-            _assert_equal(type(self.compile_params_dict[c]), list, "DL: param values must be specified in a list")
+            _assert_equal(type(self.compile_params_dict[c]), list, "DL: compile param values must be specified in a list")
         for f in self.fit_params_dict:
-            _assert_equal(type(self.fit_params_dict[f]), list, "DL: param values must be specified in a list")
+            _assert_equal(type(self.fit_params_dict[f]), list, "DL: fit param values must be specified in a list")
 
         if ModelSelectionSchema.GRID_SEARCH.startswith(self.search_type.lower()):
             _assert(self.num_configs is None and self.random_state is None,

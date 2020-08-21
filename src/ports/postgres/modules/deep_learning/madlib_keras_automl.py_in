@@ -160,7 +160,10 @@ class HyperbandSchedule():
 
 @MinWarning("warning")
 class KerasAutoML():
-    """TODO"""
+    """The core AutoML function for running AutoML algorithms such as Hyperband.
+    This function executes the hyperband rounds 'diagonally' to evaluate multiple configurations together
+    and leverage the compute power of MPP databases such as Greenplum.
+    """
     def __init__(self, schema_madlib, source_table, model_output_table, model_arch_table, model_selection_table,
                  model_id_list, compile_params_grid, fit_params_grid, automl_method='hyperband',
                  automl_params='R=6, eta=3, skip_last=0', random_state=None, object_table=None,
@@ -279,11 +282,20 @@ class KerasAutoML():
             plpy.error("DL: Only hyperband is currently supported as the automl method")
 
     def _is_valid_metrics_compute_frequency(self, num_iterations):
+        """
+        Utility function (same as that in the Fit Multiple function) to check validity of mcf value for computing
+        metrics during an AutoML algorithm run.
+        :param num_iterations: interations/resources to allocate for training.
+        :return: boolean on validity of the mcf value.
+        """
         return self.metrics_compute_frequency is None or \
                (self.metrics_compute_frequency >= 1 and \
                 self.metrics_compute_frequency <= num_iterations)
 
     def find_hyperband_config(self):
+        """
+        Runs the diagonal hyperband algorithm.
+        """
         initial_vals = {}
 
         # get hyper parameter configs for each s
@@ -291,11 +303,11 @@ class KerasAutoML():
             n = int(math.ceil(int(self.B/self.R/(s+1))*math.pow(self.eta, s))) # initial number of configurations
             r = self.R * math.pow(self.eta, -s) # initial number of iterations to run configurations for
             initial_vals[s] = (n, int(round(r)))
-        plpy.info(initial_vals) # TODO REMOVE
         self.start_training_time = self.get_current_timestamp()
         random_search = MstSearch(self.model_arch_table, self.model_selection_table, self.model_id_list,
                                   self.compile_params_grid, self.fit_params_grid, 'random',
-                                  sum([initial_vals[k][0] for k in initial_vals][self.skip_last:]), self.random_state, self.object_table)
+                                  sum([initial_vals[k][0] for k in initial_vals][self.skip_last:]), self.random_state,
+                                  self.object_table)
         random_search.load() # for populating mst tables
 
         # for creating the summary table for usage in fit multiple
@@ -307,17 +319,16 @@ class KerasAutoML():
         # outer loop on diagonal
         for i in range((self.s_max+1) - int(self.skip_last)):
             # inner loop on s desc
-            # plpy.info("----i={0}----".format(i)) # TODO REMOVE
-            # temp_lst = []
+            temp_lst = []
             configs_prune_lookup = {}
             for s in range(self.s_max, self.s_max-i-1, -1):
                 n = initial_vals[s][0]
                 n_i = n * math.pow(self.eta, -i+self.s_max-s)
-                # r_i = r * math.pow(self.eta, i-self.s_max+s)
                 configs_prune_lookup[s] = int(round(n_i))
-                # temp_lst.append("s={0},n_i={1}".format(s, int(n_i)))
-            # plpy.info('\n' + '\n'.join(temp_lst)) # TODO REMOVE
-            # plpy.info("universal r={0}".format(int(initial_vals[self.s_max-i][1])))
+                temp_lst.append("{0} configs under bracket={1} & round={2}".format(int(n_i), s, s-self.s_max+i))
+            plpy.info('*** Diagonally evaluating ' + ', '.join(temp_lst) + ' with {0} iterations ***'.format(
+                int(initial_vals[self.s_max-i][1])))
+
             self.reconstruct_temp_mst_table(i, ranges_dict, configs_prune_lookup)
             self.warm_start = int(i != 0)
             num_iterations = int(initial_vals[self.s_max-i][1])
@@ -333,9 +344,14 @@ class KerasAutoML():
         self.remove_temp_tables(model_training)
 
     def get_current_timestamp(self):
+        """for start and end times for the chosen AutoML algorithm. Showcased in the output summary table"""
         return datetime.fromtimestamp(time()).strftime('%Y-%m-%d %H:%M:%S')
 
     def mst_key_ranges_dict(self, initial_vals):
+        """
+        Extracts the ranges of model configs (using mst_keys) belonging to / sampled as part of
+        executing a particular SHA bracket.
+        """
         d = {}
         for s_val in sorted(initial_vals.keys(), reverse=True): # going from s_max to 0
             if s_val == self.s_max:
@@ -345,19 +361,21 @@ class KerasAutoML():
         return d
 
     def reconstruct_temp_mst_table(self, i, ranges_dict, configs_prune_lookup):
-
+        """
+        Drops and Reconstructs a temp mst table for evaluation along particular diagonals of hyperband.
+        :param i: outer diagonal loop iteration.
+        :param ranges_dict: model config ranges to group by bracket number.
+        :param configs_prune_lookup: Lookup dictionary for configs to evaluate for a diagonal.
+        :return:
+        """
         if i == 0:
             _assert_equal(len(configs_prune_lookup), 1, "invalid args")
             lower_bound, upper_bound = ranges_dict[self.s_max]
-            plpy.info("low,high"+str(lower_bound)+','+str(upper_bound)) # TODO REMOVE
             plpy.execute("CREATE TABLE {AutoMLSchema.TEMP_MST_TABLE} AS SELECT * FROM {self.model_selection_table} "
                          "WHERE mst_key >= {lower_bound} AND mst_key <= {upper_bound}".format(self=self,
                                                                                               AutoMLSchema=AutoMLSchema,
                                                                                               lower_bound=lower_bound,
                                                                                               upper_bound=upper_bound,))
-            plpy.info('--- TEMP MST TABLE ---')
-            rv = plpy.execute("SELECT * FROM {AutoMLSchema.TEMP_MST_TABLE}".format(AutoMLSchema=AutoMLSchema))
-            plpy.info(rv.nrows()) # TODO REMOVE
             return
         # dropping and repopulating temp_mst_table
         drop_tables([AutoMLSchema.TEMP_MST_TABLE])
@@ -383,7 +401,6 @@ class KerasAutoML():
         new_configs = True
         for s_val in configs_prune_lookup:
             lower_bound, upper_bound = ranges_dict[s_val]
-            plpy.info("low,high"+str(lower_bound)+','+str(upper_bound)) # TODO REMOVE
             if new_configs:
                 query += "INSERT INTO {AutoMLSchema.TEMP_MST_TABLE} SELECT mst_key, model_id, compile_params, fit_params " \
                          "FROM {self.model_selection_table} WHERE mst_key >= {lower_bound} " \
@@ -398,11 +415,12 @@ class KerasAutoML():
                                                                     lower_bound=lower_bound, upper_bound=upper_bound,
                                                                     configs_prune_lookup_val=configs_prune_lookup[s_val])
         plpy.execute(query)
-        plpy.info('--- TEMP MST TABLE ---')
-        rv = plpy.execute("SELECT * FROM {AutoMLSchema.TEMP_MST_TABLE}".format(AutoMLSchema=AutoMLSchema))
-        plpy.info(rv.nrows()) # TODO REMOVE
 
     def update_model_output_table(self, model_training):
+        """
+        Updates gathered information of a hyperband diagonal run to the overall model output table.
+        :param model_training: Fit Multiple function call object.
+        """
         # updates model weights for any previously trained configs
         plpy.execute("UPDATE {self.model_output_table} a SET model_weights="
                      "t.model_weights FROM {model_training.original_model_output_table} t " \
@@ -415,13 +433,19 @@ class KerasAutoML():
                                                                               model_training=model_training))
 
     def update_model_output_info_table(self, i, model_training, initial_vals):
+        """
+        Updates gathered information of a hyperband diagonal run to the overall model output info table.
+        :param i: outer diagonal loop iteration.
+        :param model_training: Fit Multiple function call object.
+        :param initial_vals: Dictionary of initial configurations and resources as part of the initial hyperband
+        schedule.
+        """
         # normalizing factor for metrics_iters due to warm start
         epochs_factor = sum([n[1] for n in initial_vals.values()][::-1][:i])
         iters = plpy.execute("SELECT {AutoMLSchema.METRICS_ITERS} " \
                              "FROM {model_training.model_summary_table}".format(AutoMLSchema=AutoMLSchema,
                                                                                 model_training=model_training))
         metrics_iters_val = [epochs_factor+mi for mi in iters[0]['metrics_iters']]
-        plpy.info('metrics_iters_val', metrics_iters_val) # TODO REMOVE
 
         # casting same metrics_iters values for the fit_multiple run with the chosen configs
         # in order to update overall info table later
@@ -460,6 +484,9 @@ class KerasAutoML():
                                                                        AutoMLSchema=AutoMLSchema))
 
     def update_model_selection_table(self):
+        """
+        Drops and re-createst the mst table to only include the best performing model configuration.
+        """
         drop_tables([self.model_selection_table])
 
         # only retaining best performing config
@@ -468,6 +495,10 @@ class KerasAutoML():
                      "ORDER BY {AutoMLSchema.LOSS_METRIC} LIMIT 1".format(self=self, AutoMLSchema=AutoMLSchema))
 
     def generate_model_output_summary_table(self, model_training):
+        """
+        Creates and populates static values related to the AutoML workload.
+        :param model_training: Fit Multiple function call object.
+        """
         create_query = plpy.prepare("""
                 CREATE TABLE {self.model_summary_table} AS
                 SELECT
@@ -505,6 +536,10 @@ class KerasAutoML():
             plpy.execute(create_query)
 
     def remove_temp_tables(self, model_training):
+        """
+        Remove all intermediate tables created for AutoML runs/updates.
+        :param model_training: Fit Multiple function call object.
+        """
         drop_tables([model_training.original_model_output_table, model_training.model_info_table,
                      model_training.model_summary_table, AutoMLSchema.TEMP_MST_TABLE,
                      AutoMLSchema.TEMP_MST_SUMMARY_TABLE])
