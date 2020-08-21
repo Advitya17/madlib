@@ -28,7 +28,6 @@ m4_include(`SQLCommon.m4')
 
 
 
-
 --------------------------- MADLIB KERAS AUTOML HYPERBAND TEST CASES ---------------------------
 
 DROP TABLE IF EXISTS iris_train_packed, iris_train_packed_summary;
@@ -53,14 +52,13 @@ DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, a
 SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
     ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
     'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
-    'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
-    'hyperband', 'R=9, eta=3, skip_last=0', NULL, NULL, FALSE, NULL, NULL, NULL, NULL);
+    'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$);
 
 SELECT assert(COUNT(*)=1, 'The length of table does not match with the inputs') FROM automl_mst_table;
 SELECT assert(COUNT(*)=1, 'The length of table does not match with the inputs') FROM automl_mst_table_summary;
 SELECT assert(COUNT(*)=1, 'The length of table does not match with the inputs') FROM automl_output_summary;
-SELECT assert(COUNT(*)=15, 'The length of table does not match with the inputs') FROM automl_output;
-SELECT assert(COUNT(*)=15, 'The length of table does not match with the inputs') FROM automl_output_info;
+SELECT assert(COUNT(*)=5, 'The length of table does not match with the inputs') FROM automl_output;
+SELECT assert(COUNT(*)=5, 'The length of table does not match with the inputs') FROM automl_output_info;
 
 -- test invalid source table
 DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
@@ -329,29 +327,6 @@ SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_mo
 SELECT assert(name='test1' AND description='test1 descr',
     'invalid name/description') FROM (SELECT * FROM automl_output_summary) summary;
 
--- test min train/val loss in mst table
-DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
-    automl_mst_table_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
-    ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
-    'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
-    'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
-    'hyperband', 'R=9, eta=3, skip_last=1', NULL, NULL, FALSE, NULL, NULL, NULL, NULL);
-
-SELECT assert(training_loss_final=(SELECT MIN(training_loss_final) FROM automl_output_info), 'min metric error')
-FROM automl_output_info WHERE mst_key=(SELECT mst_key FROM automl_mst_table);
-
-DROP TABLE IF EXISTS automl_output, automl_output_info, automl_output_summary, automl_mst_table,
-    automl_mst_table_summary;
-SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output', 'iris_model_arch', 'automl_mst_table',
-    ARRAY[1,2], $${'loss': ['categorical_crossentropy'], 'optimizer_params_list': [ {'optimizer': ['Adagrad', 'Adam'],
-    'lr': [0.9, 0.95, 'log'], 'epsilon': [0.3, 0.5, 'log_near_one']}, {'optimizer': ['Adam', 'SGD'],
-    'lr': [0.6, 0.65, 'log']} ], 'metrics':['accuracy'] }$$, $${'batch_size': [2, 4], 'epochs': [3]}$$,
-    'hyperband', 'R=9, eta=3, skip_last=1', NULL, NULL, FALSE, 'iris_test_packed', NULL, NULL, NULL);
-
-SELECT assert(validation_loss_final=(SELECT MIN(validation_loss_final) FROM automl_output_info), 'min metric error')
-FROM automl_output_info WHERE mst_key=(SELECT mst_key FROM automl_mst_table);
-
 -- test config reproducibility
 DROP TABLE IF EXISTS automl_output1, automl_output1_info, automl_output1_summary, automl_mst_table1,
     automl_mst_table1_summary;
@@ -379,12 +354,12 @@ SELECT madlib.madlib_keras_automl('iris_train_packed', 'automl_output3', 'iris_m
 
 SELECT assert(model_id=(SELECT model_id FROM automl_output2_info WHERE mst_key=7) AND
               compile_params=(SELECT compile_params FROM automl_output2_info WHERE mst_key=7) AND
-              fit_params=(SELECT fit_params FROM automl_output2_info WHERE mst_key=7))
-FROM (SELECT model_id, compile_params, fit_params FROM automl_output1_info);
+              fit_params=(SELECT fit_params FROM automl_output2_info WHERE mst_key=7), 'invalid config uniformity')
+FROM (SELECT model_id, compile_params, fit_params FROM automl_output1_info WHERE mst_key=7) output1;
 SELECT assert(model_id=(SELECT model_id FROM automl_output2_info WHERE mst_key=7) AND
               compile_params=(SELECT compile_params FROM automl_output2_info WHERE mst_key=7) AND
-              fit_params=(SELECT fit_params FROM automl_output2_info WHERE mst_key=7))
-FROM (SELECT model_id, compile_params, fit_params FROM automl_output3_info);
+              fit_params=(SELECT fit_params FROM automl_output2_info WHERE mst_key=7), 'invalid config uniformity')
+FROM (SELECT model_id, compile_params, fit_params FROM automl_output3_info WHERE mst_key=7) output3;
 
 --------------------------- HYPERBAND SCHEDULE TEST CASES ---------------------------
 -- Testing happy path with default values

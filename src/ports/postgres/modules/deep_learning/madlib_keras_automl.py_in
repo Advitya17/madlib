@@ -163,7 +163,7 @@ class KerasAutoML():
     """TODO"""
     def __init__(self, schema_madlib, source_table, model_output_table, model_arch_table, model_selection_table,
                  model_id_list, compile_params_grid, fit_params_grid, automl_method='hyperband',
-                 automl_params='R=81, eta=3, skip_last=0', random_state=None, object_table=None,
+                 automl_params='R=6, eta=3, skip_last=0', random_state=None, object_table=None,
                  use_gpus=False, validation_table=None, metrics_compute_frequency=None,
                  name=None, description=None, **kwargs):
         self.schema_madlib = schema_madlib
@@ -252,15 +252,13 @@ class KerasAutoML():
 
         if AutoMLSchema.HYPERBAND.startswith(self.automl_method.lower()):
             automl_params_dict = extract_keyvalue_params(self.automl_params,
-                                                         default_values={'R': 81, 'eta': 3, 'skip_last': 0},
+                                                         default_values={'R': 6, 'eta': 3, 'skip_last': 0},
                                                          lower_case_names=False)
             # casting dict values to int
             for i in automl_params_dict:
                 automl_params_dict[i] = int(automl_params_dict[i])
             _assert(len(automl_params_dict) >= 1 or len(automl_params_dict) <= 3,
                     "DL: Only R, eta, and skip_last may be specified")
-            if AutoMLSchema.R not in automl_params_dict:\
-                plpy.error("DL: 'R' needs to be specified in 'automl_params' for hyperband")
             for i in automl_params_dict:
                 if i == AutoMLSchema.R:
                     self.R = automl_params_dict[AutoMLSchema.R]
